@@ -4,12 +4,13 @@ import { Inter } from "next/font/google";
 import { stackServerApp } from "../stack";
 import "./globals.css";
 import { Provider } from "./provider";
+import { MantineAppProvider } from "../components/providers/MantineProvider";
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Stack Template",
-  description: "A Multi-tenant Next.js Starter Template",
+  title: "Multi-Tenant Referral Platform",
+  description: "Professional referral management with multi-tier tracking",
 };
 
 export default function RootLayout({
@@ -20,11 +21,13 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        <Provider>
-          <StackProvider app={stackServerApp}>
-            <StackTheme>{children}</StackTheme>
-          </StackProvider>
-        </Provider>
+        <MantineAppProvider>
+          <Provider>
+            <StackProvider app={stackServerApp}>
+              <StackTheme>{children}</StackTheme>
+            </StackProvider>
+          </Provider>
+        </MantineAppProvider>
       </body>
     </html>
   );

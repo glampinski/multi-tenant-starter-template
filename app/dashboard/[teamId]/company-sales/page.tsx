@@ -6,6 +6,7 @@ import { useParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { TrendingUp, DollarSign, Users, Target, Shield, Eye } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 interface SalesData {
   id: string;
@@ -18,55 +19,61 @@ interface SalesData {
   status: 'active' | 'inactive';
 }
 
-const mockSalesData: SalesData[] = [
-  {
-    id: '1',
-    salesperson: 'Sarah Johnson',
-    email: 'sarah@company.com',
-    customers: 32,
-    monthlyRevenue: 18450,
-    targetProgress: 78,
-    lastSale: '2 hours ago',
-    status: 'active'
-  },
-  {
-    id: '2',
-    salesperson: 'Emily Davis',
-    email: 'emily@company.com',
-    customers: 28,
-    monthlyRevenue: 15230,
-    targetProgress: 65,
-    lastSale: '4 hours ago',
-    status: 'active'
-  },
-  {
-    id: '3',
-    salesperson: 'Robert Brown',
-    email: 'robert@company.com',
-    customers: 19,
-    monthlyRevenue: 12890,
-    targetProgress: 45,
-    lastSale: '1 day ago',
-    status: 'active'
-  },
-  {
-    id: '4',
-    salesperson: 'Lisa White',
-    email: 'lisa@company.com',
-    customers: 35,
-    monthlyRevenue: 22100,
-    targetProgress: 85,
-    lastSale: '30 minutes ago',
-    status: 'active'
-  }
-];
-
 export default function CompanySalesPage() {
   const params = useParams<{ teamId: string }>();
   const teamId = params?.teamId;
   const { hasPermission } = useRolePermissions();
+  const [salesData, setSalesData] = useState<SalesData[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  if (!teamId || !hasPermission(teamId, PERMISSIONS.VIEW_COMPANY_DATA)) {
+  // Check permissions
+  const canViewCompanyData = hasPermission(teamId!, PERMISSIONS.VIEW_COMPANY_DATA);
+
+  useEffect(() => {
+    if (canViewCompanyData) {
+      loadSalesData();
+    }
+  }, [canViewCompanyData]);
+
+  const loadSalesData = async () => {
+    try {
+      setLoading(true);
+      
+      // Fetch sales analytics data for all team members
+      const response = await fetch('/api/customers/analytics', {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch sales data');
+      }
+
+      const data = await response.json();
+      
+      // Transform API data to match our interface
+      const transformedSalesData: SalesData[] = data.salesPersonAnalytics?.map((person: any) => ({
+        id: person.salesPersonId,
+        salesperson: person.salesPersonName || 'Unknown',
+        email: person.salesPersonEmail || '',
+        customers: person.customerCount || 0,
+        monthlyRevenue: person.totalRevenue || 0,
+        targetProgress: Math.min(((person.totalRevenue || 0) / 20000) * 100, 100), // Assuming 20k target
+        lastSale: person.lastSaleDate ? new Date(person.lastSaleDate).toLocaleDateString() : 'No sales',
+        status: (person.customerCount || 0) > 0 ? 'active' : 'inactive'
+      })) || [];
+
+      setSalesData(transformedSalesData);
+    } catch (error) {
+      console.error('Error loading sales data:', error);
+      setSalesData([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!teamId || !canViewCompanyData) {
     return (
       <div className="p-6">
         <div className="text-center">
@@ -78,9 +85,9 @@ export default function CompanySalesPage() {
     );
   }
 
-  const totalRevenue = mockSalesData.reduce((sum, sales) => sum + sales.monthlyRevenue, 0);
-  const totalCustomers = mockSalesData.reduce((sum, sales) => sum + sales.customers, 0);
-  const avgProgress = Math.round(mockSalesData.reduce((sum, sales) => sum + sales.targetProgress, 0) / mockSalesData.length);
+  const totalRevenue = salesData.reduce((sum, sales) => sum + sales.monthlyRevenue, 0);
+  const totalCustomers = salesData.reduce((sum, sales) => sum + sales.customers, 0);
+  const avgProgress = salesData.length > 0 ? Math.round(salesData.reduce((sum, sales) => sum + sales.targetProgress, 0) / salesData.length) : 0;
 
   return (
     <div className="p-6 space-y-6">
@@ -120,7 +127,7 @@ export default function CompanySalesPage() {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{mockSalesData.length}</div>
+            <div className="text-2xl font-bold">{salesData.length}</div>
             <p className="text-xs text-muted-foreground">Active salespeople</p>
           </CardContent>
         </Card>
@@ -145,63 +152,74 @@ export default function CompanySalesPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {mockSalesData.map((sales) => (
-              <div
-                key={sales.id}
-                className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800"
-              >
-                <div className="flex items-center space-x-4">
-                  <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center text-white font-semibold">
-                    {sales.salesperson.split(' ').map(n => n[0]).join('')}
-                  </div>
-                  <div>
-                    <div className="font-medium">{sales.salesperson}</div>
-                    <div className="text-sm text-gray-600 dark:text-gray-400">{sales.email}</div>
-                    <div className="text-xs text-gray-500">Last sale: {sales.lastSale}</div>
-                  </div>
-                </div>
-                
-                <div className="flex items-center space-x-6">
-                  <div className="text-center">
-                    <div className="text-sm font-medium">{sales.customers}</div>
-                    <div className="text-xs text-gray-500">Customers</div>
-                  </div>
-                  
-                  <div className="text-center">
-                    <div className="text-sm font-medium">${sales.monthlyRevenue.toLocaleString()}</div>
-                    <div className="text-xs text-gray-500">Revenue</div>
-                  </div>
-                  
-                  <div className="text-center">
-                    <div className="flex items-center space-x-1">
-                      <div className="text-sm font-medium">{sales.targetProgress}%</div>
-                      <div className={`w-16 h-2 rounded-full ${
-                        sales.targetProgress >= 75 ? 'bg-green-200' : 
-                        sales.targetProgress >= 50 ? 'bg-yellow-200' : 'bg-red-200'
-                      }`}>
-                        <div 
-                          className={`h-full rounded-full ${
-                            sales.targetProgress >= 75 ? 'bg-green-500' : 
-                            sales.targetProgress >= 50 ? 'bg-yellow-500' : 'bg-red-500'
-                          }`}
-                          style={{ width: `${Math.min(sales.targetProgress, 100)}%` }}
-                        />
-                      </div>
+          {loading ? (
+            <div className="text-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+              <p className="mt-2 text-gray-600">Loading sales data...</p>
+            </div>
+          ) : salesData.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              No sales data available yet.
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {salesData.map((sales) => (
+                <div
+                  key={sales.id}
+                  className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800"
+                >
+                  <div className="flex items-center space-x-4">
+                    <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center text-white font-semibold">
+                      {sales.salesperson.split(' ').map(n => n[0]).join('')}
                     </div>
-                    <div className="text-xs text-gray-500">Target</div>
+                    <div>
+                      <div className="font-medium">{sales.salesperson}</div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400">{sales.email}</div>
+                      <div className="text-xs text-gray-500">Last sale: {sales.lastSale}</div>
+                    </div>
                   </div>
                   
-                  <Badge 
-                    variant={sales.status === 'active' ? 'default' : 'destructive'}
-                    className="text-xs"
-                  >
-                    {sales.status}
-                  </Badge>
+                  <div className="flex items-center space-x-6">
+                    <div className="text-center">
+                      <div className="text-sm font-medium">{sales.customers}</div>
+                      <div className="text-xs text-gray-500">Customers</div>
+                    </div>
+                    
+                    <div className="text-center">
+                      <div className="text-sm font-medium">${sales.monthlyRevenue.toLocaleString()}</div>
+                      <div className="text-xs text-gray-500">Revenue</div>
+                    </div>
+                    
+                    <div className="text-center">
+                      <div className="flex items-center space-x-1">
+                        <div className="text-sm font-medium">{sales.targetProgress}%</div>
+                        <div className={`w-16 h-2 rounded-full ${
+                          sales.targetProgress >= 75 ? 'bg-green-200' : 
+                          sales.targetProgress >= 50 ? 'bg-yellow-200' : 'bg-red-200'
+                        }`}>
+                          <div 
+                            className={`h-full rounded-full ${
+                              sales.targetProgress >= 75 ? 'bg-green-500' : 
+                              sales.targetProgress >= 50 ? 'bg-yellow-500' : 'bg-red-500'
+                            }`}
+                            style={{ width: `${Math.min(sales.targetProgress, 100)}%` }}
+                          />
+                        </div>
+                      </div>
+                      <div className="text-xs text-gray-500">Target</div>
+                    </div>
+                    
+                    <Badge 
+                      variant={sales.status === 'active' ? 'default' : 'destructive'}
+                      className="text-xs"
+                    >
+                      {sales.status}
+                    </Badge>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

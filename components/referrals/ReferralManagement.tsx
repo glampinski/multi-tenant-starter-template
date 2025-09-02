@@ -80,52 +80,51 @@ export function ReferralManagement({ teamId }: { teamId?: string }) {
     try {
       setLoading(true);
       
-      // Mock data for demonstration - in production, this would come from your API
-      const mockData: ReferralData = {
+      // Fetch real data from our API
+      const [analyticsResponse, treeResponse] = await Promise.all([
+        fetch(`/api/referrals/analytics/${user.id}`, {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }),
+        fetch(`/api/referrals/tree/${user.id}`, {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        })
+      ]);
+
+      if (!analyticsResponse.ok || !treeResponse.ok) {
+        throw new Error('Failed to fetch referral data');
+      }
+
+      const analyticsData = await analyticsResponse.json();
+      const treeData = await treeResponse.json();
+
+      const referralData: ReferralData = {
         id: user.id,
         username: generateUsername(user),
         referralCode: `REF${user.id.substring(0, 6).toUpperCase()}`,
-        totalReferrals: 8,
-        directReferrals: 3,
-        totalEarnings: 245.50,
-        referralTree: [
-          {
-            id: 'ref1',
-            username: 'alice',
-            name: 'Alice Johnson',
-            role: 'customer',
-            level: 1,
-            joinedAt: '2024-01-15',
-            earnings: 50.00,
-            children: [
-              {
-                id: 'ref1a',
-                username: 'bob',
-                name: 'Bob Smith',
-                role: 'customer',
-                level: 2,
-                joinedAt: '2024-02-01',
-                earnings: 25.00,
-                children: []
-              }
-            ]
-          },
-          {
-            id: 'ref2',
-            username: 'carol',
-            name: 'Carol Wilson',
-            role: 'customer',
-            level: 1,
-            joinedAt: '2024-01-20',
-            earnings: 50.00,
-            children: []
-          }
-        ]
+        totalReferrals: analyticsData.totalReferrals || 0,
+        directReferrals: analyticsData.directReferrals || 0,
+        totalEarnings: analyticsData.totalEarnings || 0,
+        referralTree: treeData.tree || []
       };
 
-      setReferralData(mockData);
+      setReferralData(referralData);
     } catch (error) {
       console.error('Error loading referral data:', error);
+      
+      // Fallback to empty data if API fails
+      setReferralData({
+        id: user.id,
+        username: generateUsername(user),
+        referralCode: `REF${user.id.substring(0, 6).toUpperCase()}`,
+        totalReferrals: 0,
+        directReferrals: 0,
+        totalEarnings: 0,
+        referralTree: []
+      });
     } finally {
       setLoading(false);
     }

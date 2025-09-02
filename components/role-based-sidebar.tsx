@@ -13,7 +13,8 @@ import {
   Settings,
   Building,
   DollarSign,
-  Share2
+  Share2,
+  FileText
 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, usePathname } from 'next/navigation';
@@ -94,6 +95,12 @@ export function RoleBasedSidebar({ children }: RoleBasedSidebarProps) {
           href: `/dashboard/${teamId}/referrals`,
           icon: Share2,
           permission: PERMISSIONS.VIEW_ALL_DATA
+        },
+        {
+          title: "Development Roadmap",
+          href: `/roadmap`,
+          icon: FileText,
+          permission: PERMISSIONS.VIEW_ALL_DATA
         }
       ];
     }
@@ -137,6 +144,12 @@ export function RoleBasedSidebar({ children }: RoleBasedSidebarProps) {
           href: `/dashboard/${teamId}/referrals`,
           icon: Share2,
           permission: PERMISSIONS.VIEW_COMPANY_DATA
+        },
+        {
+          title: "Development Roadmap",
+          href: `/roadmap`,
+          icon: FileText,
+          permission: PERMISSIONS.MANAGE_COMPANY_USERS
         }
       ];
     }

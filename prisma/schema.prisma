@@ -1,0 +1,225 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// Enum for user roles
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  EMPLOYEE
+  SALES_PERSON
+  CUSTOMER
+}
+
+// Enum for referral statuses
+enum ReferralStatus {
+  PENDING
+  CONFIRMED
+  REWARDED
+  EXPIRED
+}
+
+// Enum for customer statuses
+enum CustomerStatus {
+  LEAD
+  PROSPECT
+  ACTIVE
+  INACTIVE
+  CHURNED
+}
+
+// Extended user profile (integrates with Stack Auth)
+model UserProfile {
+  id            String    @id @default(cuid())
+  stackUserId   String    @unique // Stack Auth user ID
+  username      String?   @unique // For referral links
+  role          UserRole  @default(CUSTOMER)
+  firstName     String?
+  lastName      String?
+  email         String    @unique
+  phone         String?
+  avatar        String?
+  companyName   String?
+  teamId        String? // Stack Auth team ID
+  
+  // Referral tracking
+  referralCode  String?   @unique
+  referredBy    String?   // stackUserId who referred this user
+  
+  // Timestamps
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  lastLoginAt   DateTime?
+  
+  // Relations
+  referralsGiven     ReferralRelationship[] @relation("Referrer")
+  referralsReceived  ReferralRelationship[] @relation("Referred")
+  rewards            ReferralReward[]
+  customersManaged   Customer[] @relation("SalesPersonCustomers")
+  salesActivities    SalesActivity[]
+  
+  @@map("user_profiles")
+}
+
+// Multi-tier referral relationships
+model ReferralRelationship {
+  id            String         @id @default(cuid())
+  referrerId    String         // Who made the referral
+  referredId    String         // Who was referred
+  level         Int            @default(1) // 1-5 levels deep
+  status        ReferralStatus @default(PENDING)
+  
+  // Referral metadata
+  referralLink  String?        // The link used for referral
+  ipAddress     String?        // For fraud detection
+  userAgent     String?        // For fraud detection
+  
+  // Timestamps
+  createdAt     DateTime       @default(now())
+  confirmedAt   DateTime?      // When the referral was confirmed
+  rewardedAt    DateTime?      // When rewards were distributed
+  
+  // Relations
+  referrer      UserProfile    @relation("Referrer", fields: [referrerId], references: [stackUserId])
+  referred      UserProfile    @relation("Referred", fields: [referredId], references: [stackUserId])
+  rewards       ReferralReward[]
+  
+  @@unique([referrerId, referredId])
+  @@map("referral_relationships")
+}
+
+// Referral rewards and commissions
+model ReferralReward {
+  id                 String               @id @default(cuid())
+  relationshipId     String               // Link to referral relationship
+  userId             String               // Who receives the reward
+  level              Int                  // Reward level (1-5)
+  rewardType         String               // "commission", "bonus", "points"
+  amount             Decimal              @db.Decimal(10,2)
+  currency           String               @default("USD")
+  
+  // Calculation details
+  baseAmount         Decimal?             @db.Decimal(10,2) // Original sale amount
+  percentage         Decimal?             @db.Decimal(5,2)  // Commission percentage
+  
+  // Status
+  isPaid             Boolean              @default(false)
+  
+  // Timestamps
+  createdAt          DateTime             @default(now())
+  paidAt             DateTime?
+  
+  // Relations
+  relationship       ReferralRelationship @relation(fields: [relationshipId], references: [id])
+  user              UserProfile          @relation(fields: [userId], references: [stackUserId])
+  
+  @@map("referral_rewards")
+}
+
+// Customer management
+model Customer {
+  id              String         @id @default(cuid())
+  
+  // Basic info
+  firstName       String
+  lastName        String
+  email           String         @unique
+  phone           String?
+  company         String?
+  position        String?
+  
+  // Customer classification
+  status          CustomerStatus @default(LEAD)
+  source          String?        // "referral", "direct", "marketing"
+  priority        String?        // "high", "medium", "low"
+  
+  // Financial
+  estimatedValue  Decimal?       @db.Decimal(10,2)
+  actualValue     Decimal?       @db.Decimal(10,2)
+  
+  // Assignment
+  salesPersonId   String?        // Assigned sales person
+  teamId          String?        // Stack Auth team ID
+  
+  // Metadata
+  notes           String?
+  tags            String[]       @default([])
+  
+  // Timestamps
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  lastContactAt   DateTime?
+  
+  // Relations
+  salesPerson     UserProfile?   @relation("SalesPersonCustomers", fields: [salesPersonId], references: [stackUserId])
+  activities      SalesActivity[]
+  
+  @@map("customers")
+}
+
+// Sales activity tracking
+model SalesActivity {
+  id            String      @id @default(cuid())
+  
+  // Activity details
+  type          String      // "call", "email", "meeting", "demo", "proposal"
+  subject       String
+  description   String?
+  outcome       String?     // "positive", "negative", "neutral"
+  
+  // Relations
+  customerId    String
+  salesPersonId String
+  teamId        String?     // Stack Auth team ID
+  
+  // Scheduling
+  scheduledAt   DateTime?
+  completedAt   DateTime?
+  
+  // Timestamps
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  
+  // Relations
+  customer      Customer    @relation(fields: [customerId], references: [id])
+  salesPerson   UserProfile @relation(fields: [salesPersonId], references: [stackUserId])
+  
+  @@map("sales_activities")
+}
+
+// Team/workspace settings (extends Stack Auth teams)
+model TeamSettings {
+  id                    String   @id @default(cuid())
+  teamId                String   @unique // Stack Auth team ID
+  
+  // Referral settings
+  referralEnabled       Boolean  @default(true)
+  maxReferralLevels     Int      @default(5)
+  referralRewardEnabled Boolean  @default(true)
+  
+  // Commission structure (per level)
+  level1Commission      Decimal  @default(10.00) @db.Decimal(5,2)
+  level2Commission      Decimal  @default(5.00)  @db.Decimal(5,2)
+  level3Commission      Decimal  @default(3.00)  @db.Decimal(5,2)
+  level4Commission      Decimal  @default(2.00)  @db.Decimal(5,2)
+  level5Commission      Decimal  @default(1.00)  @db.Decimal(5,2)
+  
+  // Business settings
+  currency              String   @default("USD")
+  timezone              String   @default("UTC")
+  
+  // Timestamps
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  
+  @@map("team_settings")
+}
