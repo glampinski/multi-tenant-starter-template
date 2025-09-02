@@ -22,6 +22,13 @@ export function PageClient() {
     }
   }, [teams, user]);
 
+  // Handle navigation after team selection
+  React.useEffect(() => {
+    if (user.selectedTeam) {
+      router.push(`/dashboard/${user.selectedTeam.id}`);
+    }
+  }, [user.selectedTeam, router]);
+
   if (teams.length === 0) {
     return (
       <div className="flex items-center justify-center h-screen w-screen p-4">
@@ -98,9 +105,15 @@ export function PageClient() {
         </Card>
       </div>
     );
-  } else if (user.selectedTeam) {
-    router.push(`/dashboard/${user.selectedTeam.id}`);
   }
 
-  return null;
+  // Show loading state while redirecting to team dashboard
+  return (
+    <div className="flex items-center justify-center h-screen w-screen">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+        <p className="mt-2 text-gray-600">Redirecting to your dashboard...</p>
+      </div>
+    </div>
+  );
 }

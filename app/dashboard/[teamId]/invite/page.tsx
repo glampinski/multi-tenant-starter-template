@@ -1,33 +1,52 @@
 'use client';
 
 import { useRolePermissions } from '@/hooks/useRolePermissions';
-import { PERMISSIONS, getRoleDisplayName, getRoleDescription } from '@/lib/permissions';
-import { useUser } from '@stackframe/stack';
+import { PERMISSIONS, ROLES, getRoleDisplayName, getRoleDescription } from '@/lib/permissions';
+import { useStackApp, useUser } from '@stackframe/stack';
 import { useParams, redirect } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useState } from 'react';
-import { UserPlus, Mail, Shield, Briefcase, Users, ShoppingCart } from 'lucide-react';
+import { UserPlus, Mail, Shield, Briefcase, Users, ShoppingCart, AlertCircle, CheckCircle } from 'lucide-react';
 
 export default function InvitePage() {
   const params = useParams<{ teamId: string }>();
   const teamId = params?.teamId;
   const user = useUser({ or: 'redirect' });
-  const { canInviteUsers, getInviteRoleOptions, getUserRole } = useRolePermissions();
+  const stackApp = useStackApp();
+  const { hasPermission, getUserRole } = useRolePermissions();
   
   const [email, setEmail] = useState('');
   const [selectedRole, setSelectedRole] = useState('');
+  const [companyDomain, setCompanyDomain] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState('');
+  const [messageType, setMessageType] = useState<'success' | 'error' | ''>('');
   
-  if (!teamId || !canInviteUsers(teamId)) {
+  // Check permissions for admin email invitations
+  if (!teamId || !hasPermission(teamId, PERMISSIONS.MANAGE_COMPANY_USERS)) {
     redirect(`/dashboard/${teamId || ''}`);
   }
   
   const currentUserRole = getUserRole(teamId);
-  const availableRoles = getInviteRoleOptions(teamId);
+  
+  // Define which roles can be invited by which roles
+  const getInviteableRoles = () => {
+    if (hasPermission(teamId, PERMISSIONS.VIEW_ALL_DATA)) {
+      // Super Admin can invite anyone except other super admins
+      return [ROLES.ADMIN, ROLES.EMPLOYEE, ROLES.SALES_PERSON];
+    }
+    if (hasPermission(teamId, PERMISSIONS.VIEW_COMPANY_DATA)) {
+      // Admin can invite employees and sales people
+      return [ROLES.EMPLOYEE, ROLES.SALES_PERSON];
+    }
+    return []; // Others cannot send email invitations
+  };
+
+  const availableRoles = getInviteableRoles();
   
   const getRoleIcon = (role: string) => {
     switch (role) {
@@ -44,26 +63,67 @@ export default function InvitePage() {
     }
   };
   
+  const validateEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) return 'Please enter a valid email address';
+    
+    // Optional: Company domain validation for employees
+    if (companyDomain && selectedRole === ROLES.EMPLOYEE) {
+      const emailDomain = email.split('@')[1];
+      if (emailDomain !== companyDomain) {
+        return `Employee email must be from company domain: ${companyDomain}`;
+      }
+    }
+    
+    return null;
+  };
+
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !selectedRole) return;
     
+    const emailError = validateEmail(email);
+    if (emailError) {
+      setMessage(emailError);
+      setMessageType('error');
+      return;
+    }
+    
     setIsLoading(true);
     setMessage('');
+    setMessageType('');
     
     try {
-      // In production, you would call your API to send the invitation
-      // with the selected role information
-      console.log('Inviting user:', { email, role: selectedRole, invitedBy: user.id });
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      setMessage(`Successfully sent invitation to ${email} as ${getRoleDisplayName(selectedRole as any)}`);
+      // Get the current team
+      const team = user.useTeam(teamId);
+      if (!team) {
+        throw new Error('Team not found');
+      }
+
+      // Send Stack Auth team invitation
+      const invitation = await team.inviteUser({
+        email: email,
+        callbackUrl: `${window.location.origin}/handler/sign-up?team_id=${teamId}&role=${selectedRole}&type=email_invitation`,
+      });
+
+      // Store role information temporarily (in production, use proper backend)
+      localStorage.setItem(`pending_invitation_${email}`, JSON.stringify({
+        role: selectedRole,
+        invitedBy: user.id,
+        invitedAt: new Date().toISOString(),
+        teamId: teamId,
+        type: 'email_invitation'
+      }));
+
+      setMessage(`Invitation sent successfully to ${email} for role: ${getRoleDisplayName(selectedRole as any)}`);
+      setMessageType('success');
       setEmail('');
       setSelectedRole('');
-    } catch (error) {
-      setMessage('Failed to send invitation. Please try again.');
+      
+    } catch (error: any) {
+      console.error('Invitation error:', error);
+      setMessage(error.message || 'Failed to send invitation. Please try again.');
+      setMessageType('error');
     } finally {
       setIsLoading(false);
     }
@@ -83,10 +143,11 @@ export default function InvitePage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <UserPlus className="h-5 w-5" />
-              Send Invitation
+              <Mail className="h-5 w-5" />
+              Email Invitation
             </CardTitle>
             <CardDescription>
+              Send professional email invitations to employees and sales people.
               As a {getRoleDisplayName(currentUserRole!)}, you can invite the following roles:
             </CardDescription>
           </CardHeader>
@@ -97,12 +158,29 @@ export default function InvitePage() {
                 <Input
                   id="email"
                   type="email"
-                  placeholder="Enter email address"
+                  placeholder="Enter business email address"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
                 />
               </div>
+              
+              {/* Company Domain Field (for employees) */}
+              {selectedRole === ROLES.EMPLOYEE && (
+                <div>
+                  <Label htmlFor="companyDomain">Company Domain (Optional)</Label>
+                  <Input
+                    id="companyDomain"
+                    type="text"
+                    placeholder="company.com"
+                    value={companyDomain}
+                    onChange={(e) => setCompanyDomain(e.target.value)}
+                  />
+                  <p className="text-sm text-gray-500 mt-1">
+                    If specified, employee email must be from this domain
+                  </p>
+                </div>
+              )}
               
               <div>
                 <Label>Select Role</Label>
@@ -144,13 +222,10 @@ export default function InvitePage() {
               </Button>
               
               {message && (
-                <div className={`p-3 rounded-md text-sm ${
-                  message.includes('Successfully') 
-                    ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
-                    : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
-                }`}>
-                  {message}
-                </div>
+                <Alert variant={messageType === 'error' ? 'destructive' : 'default'}>
+                  {messageType === 'error' ? <AlertCircle className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
+                  <AlertDescription>{message}</AlertDescription>
+                </Alert>
               )}
             </form>
           </CardContent>

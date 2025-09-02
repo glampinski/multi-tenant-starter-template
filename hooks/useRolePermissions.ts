@@ -4,9 +4,11 @@ import { useUser } from '@stackframe/stack';
 import { ROLE_PERMISSIONS, ROLES, type Role, type Permission } from '@/lib/permissions';
 
 export function useRolePermissions() {
-  const user = useUser({ or: 'redirect' });
+  const user = useUser(); // Remove 'redirect' to prevent conditional behavior
   
   const getUserRole = (teamId: string): Role | null => {
+    if (!user) return null;
+    
     const team = user.useTeam(teamId);
     if (!team) return null;
     
@@ -48,6 +50,8 @@ export function useRolePermissions() {
   };
   
   const canViewData = (teamId: string, dataOwnerId?: string): boolean => {
+    if (!user) return false;
+    
     const role = getUserRole(teamId);
     
     switch (role) {

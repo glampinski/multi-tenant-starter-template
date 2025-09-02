@@ -30,12 +30,14 @@ function SignInSignUpButtons() {
         Sign In
       </Link>
 
-      <Link
-        href={app.urls.signUp}
-        className={buttonVariants({ variant: "default" })}
+      <Button
+        variant="default"
+        disabled
+        className="cursor-not-allowed opacity-60"
+        title="Signup is by invitation only. Ask an existing member for a referral link."
       >
-        Sign Up
-      </Link>
+        Invitation Only
+      </Button>
     </>
   );
 }

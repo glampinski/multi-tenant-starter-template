@@ -6,5 +6,6 @@ export const stackServerApp = new StackServerApp({
   tokenStore: "nextjs-cookie",
   urls: {
     afterSignIn: "/dashboard",
+    afterSignUp: "/welcome", // New users go to welcome page first
   }
 });

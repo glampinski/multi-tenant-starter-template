@@ -12,7 +12,8 @@ import {
   CheckSquare, 
   Settings,
   Building,
-  DollarSign
+  DollarSign,
+  Share2
 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, usePathname } from 'next/navigation';
@@ -87,6 +88,12 @@ export function RoleBasedSidebar({ children }: RoleBasedSidebarProps) {
           href: `/dashboard/${teamId}/configuration`,
           icon: Settings,
           permission: PERMISSIONS.CONFIGURE_SYSTEM
+        },
+        {
+          title: "Global Referrals",
+          href: `/dashboard/${teamId}/referrals`,
+          icon: Share2,
+          permission: PERMISSIONS.VIEW_ALL_DATA
         }
       ];
     }
@@ -120,10 +127,16 @@ export function RoleBasedSidebar({ children }: RoleBasedSidebarProps) {
           permission: PERMISSIONS.CONFIGURE_COMPANY
         },
         {
-          title: "Invite Users",
+          title: "Email Invitations",
           href: `/dashboard/${teamId}/invite`,
           icon: UserPlus,
           permission: PERMISSIONS.MANAGE_COMPANY_USERS
+        },
+        {
+          title: "Company Referrals",
+          href: `/dashboard/${teamId}/referrals`,
+          icon: Share2,
+          permission: PERMISSIONS.VIEW_COMPANY_DATA
         }
       ];
     }
@@ -151,9 +164,15 @@ export function RoleBasedSidebar({ children }: RoleBasedSidebarProps) {
           permission: PERMISSIONS.VIEW_OWN_SALES
         },
         {
-          title: "Invite Customers",
-          href: `/dashboard/${teamId}/invite`,
-          icon: UserPlus,
+          title: "Referral Links",
+          href: `/dashboard/${teamId}/referrals`,
+          icon: Share2,
+          permission: PERMISSIONS.INVITE_CUSTOMERS
+        },
+        {
+          title: "My Network",
+          href: `/dashboard/${teamId}/referrals`,
+          icon: Share2,
           permission: PERMISSIONS.INVITE_CUSTOMERS
         }
       ];
@@ -174,6 +193,12 @@ export function RoleBasedSidebar({ children }: RoleBasedSidebarProps) {
           href: `/dashboard/${teamId}/projects`,
           icon: Building,
           permission: PERMISSIONS.VIEW_ASSIGNED_DATA
+        },
+        {
+          title: "My Network",
+          href: `/dashboard/${teamId}/referrals`,
+          icon: Share2,
+          permission: PERMISSIONS.VIEW_OWN_DASHBOARD
         }
       ];
     }
@@ -188,10 +213,16 @@ export function RoleBasedSidebar({ children }: RoleBasedSidebarProps) {
         permission: PERMISSIONS.VIEW_OWN_DASHBOARD
       },
       {
-        title: "Invite Others",
-        href: `/dashboard/${teamId}/invite`,
-        icon: UserPlus,
+        title: "Share & Earn",
+        href: `/dashboard/${teamId}/referrals`,
+        icon: Share2,
         permission: PERMISSIONS.INVITE_OTHER_CUSTOMERS
+      },
+      {
+        title: "My Network",
+        href: `/dashboard/${teamId}/referrals`,
+        icon: Share2,
+        permission: PERMISSIONS.VIEW_OWN_DASHBOARD
       }
     ];
   };

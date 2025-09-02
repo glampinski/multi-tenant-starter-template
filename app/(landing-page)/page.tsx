@@ -29,8 +29,8 @@ export default async function IndexPage() {
         capsuleLink="https://stacktemplate.com"
         title="A Multi-tenant Next.js Starter Template"
         subtitle="Built for developers, by developers. Next.js + Shadcn UI + Stack Auth."
-        primaryCtaText="Get Started"
-        primaryCtaLink={stackServerApp.urls.signUp}
+        primaryCtaText="Invitation Only"
+        primaryCtaLink="#invitation-info"
         secondaryCtaText="GitHub"
         secondaryCtaLink="https://github.com/stack-auth/stack-template"
         credits={
@@ -150,8 +150,8 @@ export default async function IndexPage() {
               "Free forever",
               "No credit card required",
             ],
-            buttonText: "Get Started",
-            buttonHref: stackServerApp.urls.signUp,
+            buttonText: "Invitation Only",
+            buttonHref: "#invitation-info",
           },
           {
             title: "Pro",
@@ -164,9 +164,8 @@ export default async function IndexPage() {
               "Free forever",
               "No credit card required",
             ],
-            buttonText: "Upgrade to Pro",
-            isPopular: true,
-            buttonHref: stackServerApp.urls.signUp,
+            buttonText: "Invitation Only",
+            buttonHref: "#invitation-info",
           },
           {
             title: "Enterprise",
@@ -180,10 +179,42 @@ export default async function IndexPage() {
               "No credit card required",
             ],
             buttonText: "Contact Us",
-            buttonHref: stackServerApp.urls.signUp,
+            buttonHref: "#invitation-info",
           },
         ]}
       />
+
+      {/* Invitation Info Section */}
+      <div id="invitation-info" className="bg-gradient-to-r from-blue-500 to-purple-600 text-white py-16">
+        <div className="container mx-auto px-4 text-center">
+          <h2 className="text-3xl font-bold mb-4">🔐 Exclusive Access Platform</h2>
+          <p className="text-xl mb-6 text-blue-100">
+            This platform operates on an invitation-only basis to ensure quality and security.
+          </p>
+          <div className="max-w-2xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="bg-white/10 backdrop-blur rounded-lg p-6">
+              <h3 className="text-lg font-semibold mb-2">🤝 Get Invited</h3>
+              <p className="text-blue-100">
+                Ask an existing member to send you a personal referral link. 
+                This ensures every new member is vouched for by our community.
+              </p>
+            </div>
+            <div className="bg-white/10 backdrop-blur rounded-lg p-6">
+              <h3 className="text-lg font-semibold mb-2">💰 Earn Rewards</h3>
+              <p className="text-blue-100">
+                When you invite others, you earn from their success through 
+                our multi-tier referral system. Everyone wins!
+              </p>
+            </div>
+          </div>
+          <div className="mt-8">
+            <p className="text-blue-200">
+              Already have an invitation link? 
+              <strong className="text-white"> Click it to get started!</strong>
+            </p>
+          </div>
+        </div>
+      </div>
     </>
   );
 }
