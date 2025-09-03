@@ -22,12 +22,12 @@ interface NavProps {
 function SignInSignUpButtons() {
   return (
     <>
-      <Button
-        onClick={() => signIn('email')}
-        variant="secondary"
+      <Link
+        href="/auth/signin"
+        className={buttonVariants({ variant: "secondary" })}
       >
         Sign In
-      </Button>
+      </Link>
 
       <Button
         variant="default"
