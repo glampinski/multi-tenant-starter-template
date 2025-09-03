@@ -55,13 +55,13 @@ export default function Dashboard() {
             router.push('/dashboard/customer_team');
             break;
           default:
-            // Fallback to main team if role is unclear
-            router.push('/dashboard/main_team');
+            // If no role found, user is not authorized
+            router.push('/auth/access-denied');
         }
       } catch (error) {
         console.error('Error determining user role:', error);
-        // Fallback to main team on error
-        router.push('/dashboard/main_team');
+        // Send to access denied page on error
+        router.push('/auth/access-denied');
       }
     };
 

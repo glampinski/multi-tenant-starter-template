@@ -38,25 +38,30 @@ export default function SignIn() {
         if (roleCheckResponse.ok) {
           const { role } = await roleCheckResponse.json();
           
-          // Role-based dashboard routing
-          switch (role) {
-            case 'SUPER_ADMIN':
-              callbackUrl = '/admin-panel';
-              break;
-            case 'ADMIN':
-              callbackUrl = '/dashboard/admin_team';
-              break;
-            case 'EMPLOYEE':
-              callbackUrl = '/dashboard/employee_team';
-              break;
-            case 'SALES_PERSON':
-              callbackUrl = '/dashboard/sales_team';
-              break;
-            case 'CUSTOMER':
-              callbackUrl = '/dashboard/customer_team';
-              break;
-            default:
-              callbackUrl = '/dashboard/main_team';
+          // If no role found, user is not authorized
+          if (!role) {
+            callbackUrl = '/auth/access-denied';
+          } else {
+            // Role-based dashboard routing for authorized users
+            switch (role) {
+              case 'SUPER_ADMIN':
+                callbackUrl = '/admin-panel';
+                break;
+              case 'ADMIN':
+                callbackUrl = '/dashboard/admin_team';
+                break;
+              case 'EMPLOYEE':
+                callbackUrl = '/dashboard/employee_team';
+                break;
+              case 'SALES_PERSON':
+                callbackUrl = '/dashboard/sales_team';
+                break;
+              case 'CUSTOMER':
+                callbackUrl = '/dashboard/customer_team';
+                break;
+              default:
+                callbackUrl = '/auth/access-denied';
+            }
           }
         }
       } catch (error) {
