@@ -1,7 +1,5 @@
-import { StackProvider, StackTheme } from "@stackframe/stack";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
-import { stackServerApp } from "../stack";
 import "./globals.css";
 import { Provider } from "./provider";
 import { MantineAppProvider } from "../components/providers/MantineProvider";
@@ -23,9 +21,7 @@ export default function RootLayout({
       <body className={inter.className}>
         <MantineAppProvider>
           <Provider>
-            <StackProvider app={stackServerApp}>
-              <StackTheme>{children}</StackTheme>
-            </StackProvider>
+            {children}
           </Provider>
         </MantineAppProvider>
       </body>

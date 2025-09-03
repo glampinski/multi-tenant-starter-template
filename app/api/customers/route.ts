@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { stackServerApp } from '@/stack'
+import { getServerSession } from 'next-auth/next'
+import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 
 // GET: Fetch customers
 export async function GET(req: NextRequest) {
   try {
-    const user = await stackServerApp.getUser()
-    if (!user) {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -41,11 +42,11 @@ export async function GET(req: NextRequest) {
 
     // Check user permissions - sales people can only see their customers
     const userProfile = await prisma.userProfile.findUnique({
-      where: { stackUserId: user.id }
+      where: { id: session.user.id }
     })
 
     if (userProfile?.role === 'SALES_PERSON') {
-      where.salesPersonId = user.id
+      where.salesPersonId = session.user.id
     }
 
     const [customers, total] = await Promise.all([
@@ -89,8 +90,8 @@ export async function GET(req: NextRequest) {
 // POST: Create new customer
 export async function POST(req: NextRequest) {
   try {
-    const user = await stackServerApp.getUser()
-    if (!user) {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -131,7 +132,7 @@ export async function POST(req: NextRequest) {
 
     // Get user's team for workspace isolation
     const userProfile = await prisma.userProfile.findUnique({
-      where: { stackUserId: user.id }
+      where: { id: session.user.id }
     })
 
     const customer = await prisma.customer.create({
@@ -148,7 +149,7 @@ export async function POST(req: NextRequest) {
         estimatedValue: estimatedValue ? parseFloat(estimatedValue) : null,
         notes,
         tags,
-        salesPersonId: salesPersonId || user.id,
+        salesPersonId: salesPersonId || session.user.id,
         teamId: userProfile?.teamId || null
       },
       include: {
@@ -176,8 +177,8 @@ export async function POST(req: NextRequest) {
 // PUT: Update customer
 export async function PUT(req: NextRequest) {
   try {
-    const user = await stackServerApp.getUser()
-    if (!user) {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -199,10 +200,10 @@ export async function PUT(req: NextRequest) {
 
     // Check permissions - sales people can only update their customers
     const userProfile = await prisma.userProfile.findUnique({
-      where: { stackUserId: user.id }
+      where: { id: session.user.id }
     })
 
-    if (userProfile?.role === 'SALES_PERSON' && existingCustomer.salesPersonId !== user.id) {
+    if (userProfile?.role === 'SALES_PERSON' && existingCustomer.salesPersonId !== session.user.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 

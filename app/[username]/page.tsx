@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
-import { stackServerApp } from '@/stack';
-import { ROLES } from '@/lib/permissions';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { ROLES } from '@/types/permissions';
 
 interface Props {
   params: { username: string };
@@ -35,10 +36,10 @@ export default async function UsernameReferralPage({ params, searchParams }: Pro
     redirect('/?error=referral-not-available');
   }
 
-  // Get the current user to see if they're already signed in
-  const user = await stackServerApp.getUser();
+  // Get the current user session to see if they're already signed in
+  const session = await getServerSession(authOptions);
   
-  if (user) {
+  if (session) {
     // User is already signed in, redirect to dashboard with referral context
     redirect(`/dashboard?ref=${username}&referrer=${username}&type=referral`);
   } else {

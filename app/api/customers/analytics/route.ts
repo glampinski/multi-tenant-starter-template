@@ -1,16 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { stackServerApp } from '@/stack'
+import { getServerSession } from 'next-auth/next'
+import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 
 export async function GET(req: NextRequest) {
   try {
-    const user = await stackServerApp.getUser()
-    if (!user) {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const { searchParams } = new URL(req.url)
-    const salesPersonId = searchParams.get('salesPersonId') || user.id
+    const salesPersonId = searchParams.get('salesPersonId') || session.user.id
     const timeframe = searchParams.get('timeframe') || '30d'
 
     // Calculate date range
@@ -18,10 +19,10 @@ export async function GET(req: NextRequest) {
 
     // Check permissions - sales people can only see their own analytics
     const userProfile = await prisma.userProfile.findUnique({
-      where: { stackUserId: user.id }
+      where: { id: session.user.id }
     })
 
-    if (userProfile?.role === 'SALES_PERSON' && salesPersonId !== user.id) {
+    if (userProfile?.role === 'SALES_PERSON' && salesPersonId !== session.user.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 

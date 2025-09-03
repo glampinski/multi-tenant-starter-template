@@ -2,91 +2,22 @@
 
 import { RoleBasedSidebar } from "@/components/role-based-sidebar";
 import { ImpersonationBanner } from "@/components/ImpersonationBanner";
-import { useUser } from "@stackframe/stack";
+import { useSession } from 'next-auth/react';
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-
-interface DevUser {
-  id: string;
-  email: string;
-  displayName: string;
-  role: string;
-  teamId: string;
-  isDev: true;
-}
-
-interface DevTeam {
-  id: string;
-  displayName: string;
-}
+import { useEffect } from "react";
 
 export default function Layout(props: { children: React.ReactNode }) {
   const params = useParams<{ teamId: string }>();
+  const { data: session, status } = useSession();
   const router = useRouter();
-  const [devUser, setDevUser] = useState<DevUser | null>(null);
-  const [devTeam, setDevTeam] = useState<DevTeam | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  // Check for development session first
-  useEffect(() => {
-    if (process.env.NODE_ENV === 'development') {
-      const devSession = document.cookie
-        .split('; ')
-        .find(row => row.startsWith('dev_session='));
-      
-      if (devSession) {
-        try {
-          const sessionData = JSON.parse(decodeURIComponent(devSession.split('=')[1]));
-          
-          if (sessionData.isDev && sessionData.exp > Date.now()) {
-            const mockUser: DevUser = {
-              id: sessionData.userId,
-              email: sessionData.email,
-              displayName: `${sessionData.firstName} ${sessionData.lastName}`,
-              role: sessionData.role,
-              teamId: sessionData.teamId,
-              isDev: true
-            };
-
-            const mockTeam: DevTeam = {
-              id: sessionData.teamId,
-              displayName: 'Test Company'
-            };
-
-            setDevUser(mockUser);
-            setDevTeam(mockTeam);
-            setLoading(false);
-            return;
-          }
-        } catch (error) {
-          console.error('Error parsing dev session:', error);
-        }
-      }
-    }
-    setLoading(false);
-  }, []);
-
-  // Only use Stack Auth if no dev session
-  const stackUser = devUser ? null : useUser({ or: 'redirect' });
-  const stackTeam = stackUser?.useTeam(params?.teamId);
-
-  // Determine which user/team to use
-  const user = devUser || stackUser;
-  const team = devTeam || stackTeam;
 
   useEffect(() => {
-    if (!loading && !user) {
-      if (process.env.NODE_ENV === 'development') {
-        router.push('/dev-login');
-      } else {
-        // Let Stack Auth handle redirection
-      }
-    } else if (!loading && user && !team) {
-      router.push('/dashboard');
+    if (status === 'unauthenticated') {
+      router.push('/auth/signin');
     }
-  }, [user, team, router, loading]);
+  }, [status, router]);
 
-  if (loading || !user) {
+  if (status === 'loading') {
     return (
       <div className="flex items-center justify-center h-screen w-screen">
         <div className="text-center">
@@ -97,21 +28,20 @@ export default function Layout(props: { children: React.ReactNode }) {
     );
   }
 
-  if (!team) {
-    return (
-      <div className="flex items-center justify-center h-screen w-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-2 text-gray-600">Loading team...</p>
-        </div>
-      </div>
-    );
+  if (!session) {
+    return null; // Will redirect via useEffect
   }
+
+  // Create a mock team object for compatibility
+  const mockTeam = {
+    id: params?.teamId || 'main_team',
+    displayName: 'Main Team'
+  };
 
   return (
     <>
       <ImpersonationBanner />
-      <RoleBasedSidebar user={user} team={team}>
+      <RoleBasedSidebar user={session.user} team={mockTeam}>
         {props.children}
       </RoleBasedSidebar>
     </>

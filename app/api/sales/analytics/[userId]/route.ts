@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { stackServerApp } from '@/stack'
+import { getServerSession } from 'next-auth/next'
+import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 
 export async function GET(
   req: NextRequest,
   { params }: { params: { userId: string } }
 ) {
   try {
-    const user = await stackServerApp.getUser()
-    if (!user) {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -18,10 +19,10 @@ export async function GET(
 
     // Check permissions
     const userProfile = await prisma.userProfile.findUnique({
-      where: { stackUserId: user.id }
+      where: { id: session.user.id }
     })
 
-    if (userProfile?.role === 'SALES_PERSON' && userId !== user.id) {
+    if (userProfile?.role === 'SALES_PERSON' && userId !== session.user.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 

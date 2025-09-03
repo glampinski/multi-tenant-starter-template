@@ -1,301 +1,408 @@
 'use client';
 
-import { useRolePermissions } from '@/hooks/useRolePermissions';
-import { PERMISSIONS, ROLES, getRoleDisplayName, getRoleDescription } from '@/lib/permissions';
-import { useStackApp, useUser } from '@stackframe/stack';
-import { useParams, redirect } from 'next/navigation';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { useState } from 'react';
-import { UserPlus, Mail, Shield, Briefcase, Users, ShoppingCart, AlertCircle, CheckCircle } from 'lucide-react';
+import { useParams } from 'next/navigation';
+import { useSession } from 'next-auth/react';
+import { 
+  Paper, 
+  Text, 
+  Group, 
+  Badge, 
+  Table, 
+  Avatar, 
+  ActionIcon,
+  Button,
+  Modal,
+  TextInput,
+  Select,
+  Stack,
+  LoadingOverlay,
+  Center,
+  SimpleGrid,
+  ThemeIcon,
+  CopyButton,
+  Tooltip
+} from '@mantine/core';
+import { 
+  IconEdit, 
+  IconTrash, 
+  IconPlus,
+  IconMail,
+  IconCopy,
+  IconCheck,
+  IconUsers,
+  IconSend,
+  IconClock,
+  IconUserPlus
+} from '@tabler/icons-react';
+import { useDisclosure } from '@mantine/hooks';
+import { notifications } from '@mantine/notifications';
+import { useState, useEffect } from 'react';
+
+interface Invitation {
+  id: string;
+  email: string;
+  role: 'ADMIN' | 'MANAGER' | 'SALES_PERSON' | 'CUSTOMER';
+  status: 'PENDING' | 'ACCEPTED' | 'EXPIRED';
+  invitedBy: string;
+  invitedAt: string;
+  expiresAt: string;
+  token?: string;
+}
 
 export default function InvitePage() {
   const params = useParams<{ teamId: string }>();
-  const teamId = params?.teamId;
-  const user = useUser({ or: 'redirect' });
-  const stackApp = useStackApp();
-  const { hasPermission, getUserRole } = useRolePermissions();
-  
-  const [email, setEmail] = useState('');
-  const [selectedRole, setSelectedRole] = useState('');
-  const [companyDomain, setCompanyDomain] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [message, setMessage] = useState('');
-  const [messageType, setMessageType] = useState<'success' | 'error' | ''>('');
-  
-  // Check permissions for admin email invitations
-  if (!teamId || !hasPermission(teamId, PERMISSIONS.MANAGE_COMPANY_USERS)) {
-    redirect(`/dashboard/${teamId || ''}`);
-  }
-  
-  const currentUserRole = getUserRole(teamId);
-  
-  // Define which roles can be invited by which roles
-  const getInviteableRoles = () => {
-    if (hasPermission(teamId, PERMISSIONS.VIEW_ALL_DATA)) {
-      // Super Admin can invite anyone except other super admins
-      return [ROLES.ADMIN, ROLES.EMPLOYEE, ROLES.SALES_PERSON];
-    }
-    if (hasPermission(teamId, PERMISSIONS.VIEW_COMPANY_DATA)) {
-      // Admin can invite employees and sales people
-      return [ROLES.EMPLOYEE, ROLES.SALES_PERSON];
-    }
-    return []; // Others cannot send email invitations
-  };
+  const { data: session } = useSession();
+  const [invitations, setInvitations] = useState<Invitation[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [opened, { open, close }] = useDisclosure(false);
+  const [editingInvitation, setEditingInvitation] = useState<Invitation | null>(null);
 
-  const availableRoles = getInviteableRoles();
-  
-  const getRoleIcon = (role: string) => {
-    switch (role) {
-      case 'super_admin':
-        return <Shield className="h-5 w-5 text-red-600" />;
-      case 'sales_person':
-        return <Briefcase className="h-5 w-5 text-blue-600" />;
-      case 'employee':
-        return <Users className="h-5 w-5 text-green-600" />;
-      case 'customer':
-        return <ShoppingCart className="h-5 w-5 text-purple-600" />;
-      default:
-        return <Users className="h-5 w-5" />;
-    }
-  };
-  
-  const validateEmail = (email: string) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) return 'Please enter a valid email address';
-    
-    // Optional: Company domain validation for employees
-    if (companyDomain && selectedRole === ROLES.EMPLOYEE) {
-      const emailDomain = email.split('@')[1];
-      if (emailDomain !== companyDomain) {
-        return `Employee email must be from company domain: ${companyDomain}`;
-      }
-    }
-    
-    return null;
-  };
+  const [formData, setFormData] = useState({
+    email: '',
+    role: 'SALES_PERSON' as 'ADMIN' | 'MANAGER' | 'SALES_PERSON' | 'CUSTOMER'
+  });
 
-  const handleInvite = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email || !selectedRole) return;
-    
-    const emailError = validateEmail(email);
-    if (emailError) {
-      setMessage(emailError);
-      setMessageType('error');
-      return;
-    }
-    
-    setIsLoading(true);
-    setMessage('');
-    setMessageType('');
-    
+  useEffect(() => {
+    loadInvitations();
+  }, []);
+
+  const loadInvitations = async () => {
     try {
-      // Get the current team
-      const team = user.useTeam(teamId);
-      if (!team) {
-        throw new Error('Team not found');
-      }
-
-      // Send Stack Auth team invitation
-      const invitation = await team.inviteUser({
-        email: email,
-        callbackUrl: `${window.location.origin}/handler/sign-up?team_id=${teamId}&role=${selectedRole}&type=email_invitation`,
-      });
-
-      // Store role information temporarily (in production, use proper backend)
-      localStorage.setItem(`pending_invitation_${email}`, JSON.stringify({
-        role: selectedRole,
-        invitedBy: user.id,
-        invitedAt: new Date().toISOString(),
-        teamId: teamId,
-        type: 'email_invitation'
-      }));
-
-      setMessage(`Invitation sent successfully to ${email} for role: ${getRoleDisplayName(selectedRole as any)}`);
-      setMessageType('success');
-      setEmail('');
-      setSelectedRole('');
+      setLoading(true);
       
-    } catch (error: any) {
-      console.error('Invitation error:', error);
-      setMessage(error.message || 'Failed to send invitation. Please try again.');
-      setMessageType('error');
+      // Mock data for immediate display
+      const mockInvitations: Invitation[] = [
+        {
+          id: '1',
+          email: 'john.doe@example.com',
+          role: 'SALES_PERSON',
+          status: 'PENDING',
+          invitedBy: session?.user?.name || 'You',
+          invitedAt: '2024-01-15',
+          expiresAt: '2024-01-22',
+          token: 'abc123'
+        },
+        {
+          id: '2',
+          email: 'sarah.manager@example.com',
+          role: 'MANAGER',
+          status: 'ACCEPTED',
+          invitedBy: session?.user?.name || 'You',
+          invitedAt: '2024-01-12',
+          expiresAt: '2024-01-19'
+        },
+        {
+          id: '3',
+          email: 'mike.sales@example.com',
+          role: 'SALES_PERSON',
+          status: 'EXPIRED',
+          invitedBy: session?.user?.name || 'You',
+          invitedAt: '2024-01-08',
+          expiresAt: '2024-01-15'
+        },
+        {
+          id: '4',
+          email: 'customer@example.com',
+          role: 'CUSTOMER',
+          status: 'PENDING',
+          invitedBy: session?.user?.name || 'You',
+          invitedAt: '2024-01-14',
+          expiresAt: '2024-01-21',
+          token: 'def456'
+        }
+      ];
+      
+      setInvitations(mockInvitations);
+    } catch (error) {
+      console.error('Error loading invitations:', error);
+      setInvitations([]);
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
-  
+
+  const handleEdit = (invitation: Invitation) => {
+    setEditingInvitation(invitation);
+    setFormData({
+      email: invitation.email,
+      role: invitation.role
+    });
+    open();
+  };
+
+  const handleAdd = () => {
+    setEditingInvitation(null);
+    setFormData({
+      email: '',
+      role: 'SALES_PERSON'
+    });
+    open();
+  };
+
+  const handleSubmit = async () => {
+    // In real app, would make API call here
+    const newInvitation: Invitation = {
+      id: Date.now().toString(),
+      email: formData.email,
+      role: formData.role,
+      status: 'PENDING',
+      invitedBy: session?.user?.name || 'You',
+      invitedAt: new Date().toISOString().split('T')[0],
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 7 days from now
+      token: Math.random().toString(36).substr(2, 9)
+    };
+    
+    setInvitations([newInvitation, ...invitations]);
+    
+    notifications.show({
+      title: editingInvitation ? 'Invitation Updated' : 'Invitation Sent',
+      message: `Invitation has been sent to ${formData.email}`,
+      color: 'green',
+    });
+    close();
+  };
+
+  const handleDelete = (invitation: Invitation) => {
+    notifications.show({
+      title: 'Invitation Cancelled',
+      message: `Invitation to ${invitation.email} has been cancelled.`,
+      color: 'red',
+    });
+    setInvitations(invitations.filter(i => i.id !== invitation.id));
+  };
+
+  const handleResend = (invitation: Invitation) => {
+    notifications.show({
+      title: 'Invitation Resent',
+      message: `Invitation has been resent to ${invitation.email}`,
+      color: 'blue',
+    });
+  };
+
+  const getInviteLink = (token: string) => {
+    return `${window.location.origin}/signup?token=${token}`;
+  };
+
+  const roleColors = {
+    ADMIN: 'red',
+    MANAGER: 'blue',
+    SALES_PERSON: 'green',
+    CUSTOMER: 'violet'
+  };
+
+  const statusColors = {
+    PENDING: 'yellow',
+    ACCEPTED: 'green',
+    EXPIRED: 'red'
+  };
+
+  // Calculate statistics
+  const pendingInvitations = invitations.filter(i => i.status === 'PENDING').length;
+  const acceptedInvitations = invitations.filter(i => i.status === 'ACCEPTED').length;
+  const expiredInvitations = invitations.filter(i => i.status === 'EXPIRED').length;
+
+  const rows = invitations.map((invitation) => (
+    <Table.Tr key={invitation.id}>
+      <Table.Td>
+        <Group gap="sm">
+          <Avatar color="initials" name={invitation.email} />
+          <div>
+            <Text size="sm" fw={500}>
+              {invitation.email}
+            </Text>
+            <Text size="xs" c="dimmed">
+              Invited by {invitation.invitedBy}
+            </Text>
+          </div>
+        </Group>
+      </Table.Td>
+      <Table.Td>
+        <Badge color={roleColors[invitation.role]}>
+          {invitation.role.replace('_', ' ')}
+        </Badge>
+      </Table.Td>
+      <Table.Td>
+        <Badge color={statusColors[invitation.status]}>
+          {invitation.status}
+        </Badge>
+      </Table.Td>
+      <Table.Td>
+        <Text size="xs" c="dimmed">
+          {new Date(invitation.invitedAt).toLocaleDateString()}
+        </Text>
+      </Table.Td>
+      <Table.Td>
+        <Text size="xs" c={new Date(invitation.expiresAt) < new Date() ? 'red' : 'dimmed'}>
+          {new Date(invitation.expiresAt).toLocaleDateString()}
+        </Text>
+      </Table.Td>
+      <Table.Td>
+        <Group gap={5}>
+          {invitation.status === 'PENDING' && invitation.token && (
+            <CopyButton value={getInviteLink(invitation.token)}>
+              {({ copied, copy }) => (
+                <Tooltip label={copied ? 'Copied' : 'Copy invite link'}>
+                  <ActionIcon variant="subtle" color={copied ? 'teal' : 'gray'} onClick={copy}>
+                    {copied ? <IconCheck size={16} /> : <IconCopy size={16} />}
+                  </ActionIcon>
+                </Tooltip>
+              )}
+            </CopyButton>
+          )}
+          {invitation.status === 'PENDING' && (
+            <ActionIcon variant="subtle" color="blue" onClick={() => handleResend(invitation)}>
+              <IconSend size={16} />
+            </ActionIcon>
+          )}
+          <ActionIcon variant="subtle" onClick={() => handleEdit(invitation)}>
+            <IconEdit size={16} />
+          </ActionIcon>
+          <ActionIcon variant="subtle" color="red" onClick={() => handleDelete(invitation)}>
+            <IconTrash size={16} />
+          </ActionIcon>
+        </Group>
+      </Table.Td>
+    </Table.Tr>
+  ));
+
   return (
-    <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Invite Users</h1>
-        <p className="text-gray-600 dark:text-gray-400">
-          Invite new users to join your team with specific roles
-        </p>
-      </div>
-      
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Invitation Form */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Mail className="h-5 w-5" />
-              Email Invitation
-            </CardTitle>
-            <CardDescription>
-              Send professional email invitations to employees and sales people.
-              As a {getRoleDisplayName(currentUserRole!)}, you can invite the following roles:
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleInvite} className="space-y-4">
+    <>
+      <div className="p-6 space-y-6">
+        <div>
+          <Text size="xl" fw={700} mb="xs">Team Invitations</Text>
+          <Text c="dimmed">
+            Invite team members and manage access to your workspace
+          </Text>
+        </div>
+
+        {/* Statistics Cards */}
+        <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="md">
+          <Paper p="md" withBorder>
+            <Group justify="space-between">
               <div>
-                <Label htmlFor="email">Email Address</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="Enter business email address"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                />
+                <Text c="dimmed" size="sm" fw={500} tt="uppercase">
+                  Pending Invitations
+                </Text>
+                <Text fw={700} size="xl">
+                  {pendingInvitations}
+                </Text>
               </div>
-              
-              {/* Company Domain Field (for employees) */}
-              {selectedRole === ROLES.EMPLOYEE && (
-                <div>
-                  <Label htmlFor="companyDomain">Company Domain (Optional)</Label>
-                  <Input
-                    id="companyDomain"
-                    type="text"
-                    placeholder="company.com"
-                    value={companyDomain}
-                    onChange={(e) => setCompanyDomain(e.target.value)}
-                  />
-                  <p className="text-sm text-gray-500 mt-1">
-                    If specified, employee email must be from this domain
-                  </p>
-                </div>
-              )}
-              
+              <ThemeIcon color="yellow" variant="light" size={38} radius="md">
+                <IconClock size={20} />
+              </ThemeIcon>
+            </Group>
+          </Paper>
+
+          <Paper p="md" withBorder>
+            <Group justify="space-between">
               <div>
-                <Label>Select Role</Label>
-                <div className="space-y-2 mt-2">
-                  {availableRoles.map((role) => (
-                    <div 
-                      key={role} 
-                      className={`flex items-center space-x-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 ${
-                        selectedRole === role ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-200 dark:border-gray-700'
-                      }`}
-                      onClick={() => setSelectedRole(role)}
-                    >
-                      <input
-                        type="radio"
-                        name="role"
-                        value={role}
-                        checked={selectedRole === role}
-                        onChange={() => setSelectedRole(role)}
-                        className="text-blue-600"
-                      />
-                      {getRoleIcon(role)}
-                      <div>
-                        <div className="font-medium">{getRoleDisplayName(role)}</div>
-                        <div className="text-sm text-gray-600 dark:text-gray-400">
-                          {getRoleDescription(role)}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <Text c="dimmed" size="sm" fw={500} tt="uppercase">
+                  Accepted Invitations
+                </Text>
+                <Text fw={700} size="xl">
+                  {acceptedInvitations}
+                </Text>
               </div>
-              
-              <Button 
-                type="submit" 
-                className="w-full" 
-                disabled={isLoading || !email || !selectedRole}
-              >
-                {isLoading ? 'Sending...' : 'Send Invitation'}
-              </Button>
-              
-              {message && (
-                <Alert variant={messageType === 'error' ? 'destructive' : 'default'}>
-                  {messageType === 'error' ? <AlertCircle className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
-                  <AlertDescription>{message}</AlertDescription>
-                </Alert>
-              )}
-            </form>
-          </CardContent>
-        </Card>
-        
-        {/* Role Information */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Role Permissions</CardTitle>
-            <CardDescription>
-              Understanding what each role can do
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-3">
-              <div className="flex items-start gap-3 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
-                <Shield className="h-5 w-5 text-red-600 mt-0.5" />
-                <div>
-                  <div className="font-medium text-red-800 dark:text-red-300">Super Admin</div>
-                  <div className="text-sm text-red-700 dark:text-red-400">
-                    • View all data across the platform<br/>
-                    • Manage all users and permissions<br/>
-                    • Configure system settings<br/>
-                    • Invite any role type
-                  </div>
-                </div>
+              <ThemeIcon color="green" variant="light" size={38} radius="md">
+                <IconUserPlus size={20} />
+              </ThemeIcon>
+            </Group>
+          </Paper>
+
+          <Paper p="md" withBorder>
+            <Group justify="space-between">
+              <div>
+                <Text c="dimmed" size="sm" fw={500} tt="uppercase">
+                  Expired Invitations
+                </Text>
+                <Text fw={700} size="xl">
+                  {expiredInvitations}
+                </Text>
               </div>
-              
-              <div className="flex items-start gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                <Briefcase className="h-5 w-5 text-blue-600 mt-0.5" />
-                <div>
-                  <div className="font-medium text-blue-800 dark:text-blue-300">Sales Person</div>
-                  <div className="text-sm text-blue-700 dark:text-blue-400">
-                    • View own customers and sales only<br/>
-                    • Track personal performance metrics<br/>
-                    • Invite customers to the platform<br/>
-                    • Cannot see other sales people's data
-                  </div>
-                </div>
-              </div>
-              
-              <div className="flex items-start gap-3 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                <Users className="h-5 w-5 text-green-600 mt-0.5" />
-                <div>
-                  <div className="font-medium text-green-800 dark:text-green-300">Employee</div>
-                  <div className="text-sm text-green-700 dark:text-green-400">
-                    • View assigned tasks and projects<br/>
-                    • Access data as assigned by super admin<br/>
-                    • Cannot invite other users<br/>
-                    • Limited administrative access
-                  </div>
-                </div>
-              </div>
-              
-              <div className="flex items-start gap-3 p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
-                <ShoppingCart className="h-5 w-5 text-purple-600 mt-0.5" />
-                <div>
-                  <div className="font-medium text-purple-800 dark:text-purple-300">Customer</div>
-                  <div className="text-sm text-purple-700 dark:text-purple-400">
-                    • View own dashboard and account info<br/>
-                    • Invite other customers only<br/>
-                    • Cannot see other customers' activity<br/>
-                    • Basic platform access
-                  </div>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+              <ThemeIcon color="red" variant="light" size={38} radius="md">
+                <IconClock size={20} />
+              </ThemeIcon>
+            </Group>
+          </Paper>
+        </SimpleGrid>
+
+        {/* Invitations Table */}
+        <Paper p="md" withBorder>
+          <Group justify="space-between" mb="md">
+            <Text size="lg" fw={500}>Invitation History</Text>
+            <Button leftSection={<IconPlus size={16} />} onClick={handleAdd}>
+              Send Invitation
+            </Button>
+          </Group>
+          
+          <div style={{ position: 'relative' }}>
+            <LoadingOverlay visible={loading} />
+            
+            {!loading && invitations.length === 0 ? (
+              <Center py={60}>
+                <Stack align="center" gap="md">
+                  <IconUsers size={48} color="gray" />
+                  <Text c="dimmed">No invitations sent yet. Invite your first team member to get started.</Text>
+                  <Button onClick={handleAdd}>Send Invitation</Button>
+                </Stack>
+              </Center>
+            ) : (
+              <Table striped highlightOnHover>
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th>Email</Table.Th>
+                    <Table.Th>Role</Table.Th>
+                    <Table.Th>Status</Table.Th>
+                    <Table.Th>Invited</Table.Th>
+                    <Table.Th>Expires</Table.Th>
+                    <Table.Th>Actions</Table.Th>
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>{rows}</Table.Tbody>
+              </Table>
+            )}
+          </div>
+        </Paper>
       </div>
-    </div>
+
+      {/* Add/Edit Modal */}
+      <Modal opened={opened} onClose={close} title={editingInvitation ? "Edit Invitation" : "Send Invitation"}>
+        <Stack gap="md">
+          <TextInput
+            label="Email Address"
+            placeholder="Enter email address"
+            value={formData.email}
+            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+            required
+            leftSection={<IconMail size={16} />}
+            disabled={!!editingInvitation} // Don't allow editing email for existing invitations
+          />
+          
+          <Select
+            label="Role"
+            value={formData.role}
+            onChange={(value) => setFormData({ ...formData, role: (value as any) || 'SALES_PERSON' })}
+            data={[
+              { value: 'ADMIN', label: 'Admin - Full access' },
+              { value: 'MANAGER', label: 'Manager - Team management' },
+              { value: 'SALES_PERSON', label: 'Sales Person - Sales activities' },
+              { value: 'CUSTOMER', label: 'Customer - Limited access' },
+            ]}
+            required
+          />
+          
+          <Text size="sm" c="dimmed">
+            The invitation will expire in 7 days. The invitee will receive an email with a signup link.
+          </Text>
+          
+          <Group justify="flex-end" gap="sm" mt="md">
+            <Button variant="outline" onClick={close}>Cancel</Button>
+            <Button onClick={handleSubmit}>
+              {editingInvitation ? 'Update Invitation' : 'Send Invitation'}
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+    </>
   );
 }

@@ -37,23 +37,26 @@ enum CustomerStatus {
   CHURNED
 }
 
-// Extended user profile (integrates with Stack Auth)
+// Extended user profile (updated for NextAuth)
 model UserProfile {
   id            String    @id @default(cuid())
-  stackUserId   String    @unique // Stack Auth user ID
+  email         String    @unique
   username      String?   @unique // For referral links
   role          UserRole  @default(CUSTOMER)
   firstName     String?
   lastName      String?
-  email         String    @unique
   phone         String?
   avatar        String?
   companyName   String?
-  teamId        String? // Stack Auth team ID
+  teamId        String?   @default("main_team") // Single team approach
+  
+  // NextAuth invitation system
+  inviteVerified Boolean   @default(false)
+  lineagePath    String[]  // Array of ancestor IDs for efficient queries
   
   // Referral tracking
   referralCode  String?   @unique
-  referredBy    String?   // stackUserId who referred this user
+  referrerId    String?   // Direct referrer ID
   
   // Timestamps
   createdAt     DateTime  @default(now())
@@ -61,6 +64,11 @@ model UserProfile {
   lastLoginAt   DateTime?
   
   // Relations
+  referrer           UserProfile?           @relation("UserReferrals", fields: [referrerId], references: [id])
+  referrals          UserProfile[]          @relation("UserReferrals")
+  sentInvites        Invite[]               @relation("UserInvites")
+  userPermissions    UserPermission[]       // User-specific permissions
+  
   referralsGiven     ReferralRelationship[] @relation("Referrer")
   referralsReceived  ReferralRelationship[] @relation("Referred")
   rewards            ReferralReward[]
@@ -68,6 +76,74 @@ model UserProfile {
   salesActivities    SalesActivity[]
   
   @@map("user_profiles")
+}
+
+// NextAuth invitation system
+model Invite {
+  id          String   @id @default(cuid())
+  token       String   @unique
+  email       String
+  role        UserRole @default(CUSTOMER)
+  invitedBy   String   // referrer user ID
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdAt   DateTime @default(now())
+  
+  inviter     UserProfile @relation("UserInvites", fields: [invitedBy], references: [id])
+  
+  @@map("invites")
+}
+
+// NextAuth required tables
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("sessions")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  accounts      Account[]
+  sessions      Session[]
+  
+  @@map("users")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
 }
 
 // Multi-tier referral relationships
@@ -85,12 +161,13 @@ model ReferralRelationship {
   
   // Timestamps
   createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
   confirmedAt   DateTime?      // When the referral was confirmed
   rewardedAt    DateTime?      // When rewards were distributed
   
   // Relations
-  referrer      UserProfile    @relation("Referrer", fields: [referrerId], references: [stackUserId])
-  referred      UserProfile    @relation("Referred", fields: [referredId], references: [stackUserId])
+  referrer      UserProfile    @relation("Referrer", fields: [referrerId], references: [id])
+  referred      UserProfile    @relation("Referred", fields: [referredId], references: [id])
   rewards       ReferralReward[]
   
   @@unique([referrerId, referredId])
@@ -120,7 +197,7 @@ model ReferralReward {
   
   // Relations
   relationship       ReferralRelationship @relation(fields: [relationshipId], references: [id])
-  user              UserProfile          @relation(fields: [userId], references: [stackUserId])
+  user              UserProfile          @relation(fields: [userId], references: [id])
   
   @@map("referral_rewards")
 }
@@ -148,7 +225,7 @@ model Customer {
   
   // Assignment
   salesPersonId   String?        // Assigned sales person
-  teamId          String?        // Stack Auth team ID
+  teamId          String?        @default("main_team") // Single team approach
   
   // Metadata
   notes           String?
@@ -160,7 +237,7 @@ model Customer {
   lastContactAt   DateTime?
   
   // Relations
-  salesPerson     UserProfile?   @relation("SalesPersonCustomers", fields: [salesPersonId], references: [stackUserId])
+  salesPerson     UserProfile?   @relation("SalesPersonCustomers", fields: [salesPersonId], references: [id])
   activities      SalesActivity[]
   
   @@map("customers")
@@ -179,7 +256,7 @@ model SalesActivity {
   // Relations
   customerId    String
   salesPersonId String
-  teamId        String?     // Stack Auth team ID
+  teamId        String?     @default("main_team") // Single team approach
   
   // Scheduling
   scheduledAt   DateTime?
@@ -191,15 +268,15 @@ model SalesActivity {
   
   // Relations
   customer      Customer    @relation(fields: [customerId], references: [id])
-  salesPerson   UserProfile @relation(fields: [salesPersonId], references: [stackUserId])
+  salesPerson   UserProfile @relation(fields: [salesPersonId], references: [id])
   
   @@map("sales_activities")
 }
 
-// Team/workspace settings (extends Stack Auth teams)
+// Team/workspace settings (single team approach)
 model TeamSettings {
   id                    String   @id @default(cuid())
-  teamId                String   @unique // Stack Auth team ID
+  teamId                String   @unique @default("main_team") // Single team approach
   
   // Referral settings
   referralEnabled       Boolean  @default(true)
@@ -249,7 +326,7 @@ model RolePermission {
   id           String   @id @default(cuid())
   role         UserRole
   permissionId String
-  teamId       String   // Stack Auth team ID
+  teamId       String   @default("main_team") // Single team approach
   
   // Relations
   permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
@@ -265,13 +342,14 @@ model RolePermission {
 // User-specific permission overrides
 model UserPermission {
   id           String      @id @default(cuid())
-  userId       String      // Stack Auth user ID
+  userId       String      // UserProfile ID
   permissionId String
-  teamId       String      // Stack Auth team ID
+  teamId       String      @default("main_team") // Single team approach
   granted      Boolean     @default(true) // false = explicitly denied (override role permission)
   
   // Relations
   permission   Permission  @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  user         UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
   
   // Timestamps
   createdAt    DateTime    @default(now())

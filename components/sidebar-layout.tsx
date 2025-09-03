@@ -1,12 +1,13 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { UserButton } from "@stackframe/stack";
-import { LucideIcon, Menu } from "lucide-react";
+import { useSession, signOut } from "next-auth/react";
+import { LucideIcon, Menu, LogOut, User } from "lucide-react";
 import { useTheme } from "next-themes";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import { Button } from "./ui/button";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -185,11 +186,24 @@ export default function SidebarLayout(props: {
             </div>
           </div>
 
-          <UserButton
-            colorModeToggle={() =>
-              setTheme(resolvedTheme === "light" ? "dark" : "light")
-            }
-          />
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setTheme(resolvedTheme === "light" ? "dark" : "light")}
+            >
+              {resolvedTheme === "light" ? "🌙" : "☀️"}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => signOut()}
+              className="gap-2"
+            >
+              <User className="h-4 w-4" />
+              <LogOut className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
         <div className="flex-grow">{props.children}</div>
       </div>

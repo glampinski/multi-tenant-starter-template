@@ -1,163 +1,456 @@
 'use client';
 
-import { useRolePermissions } from '@/hooks/useRolePermissions';
-import { PERMISSIONS } from '@/lib/permissions';
-import { useUser } from '@stackframe/stack';
-import { useParams, redirect } from 'next/navigation';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { TrendingUp, DollarSign, Target, Calendar } from 'lucide-react';
+import { useParams } from 'next/navigation';
+import { useSession } from 'next-auth/react';
+import { 
+  Paper, 
+  Text, 
+  Group, 
+  Badge, 
+  Table, 
+  Avatar, 
+  ActionIcon,
+  Button,
+  Modal,
+  TextInput,
+  NumberInput,
+  Select,
+  Stack,
+  LoadingOverlay,
+  Center,
+  SimpleGrid,
+  ThemeIcon,
+  RingProgress
+} from '@mantine/core';
+import { 
+  IconEdit, 
+  IconTrash, 
+  IconPlus,
+  IconEye,
+  IconCoin,
+  IconTrendingUp,
+  IconCalendar,
+  IconShoppingCart,
+  IconTarget
+} from '@tabler/icons-react';
+import { useDisclosure } from '@mantine/hooks';
+import { notifications } from '@mantine/notifications';
+import { useState, useEffect } from 'react';
+
+interface Sale {
+  id: string;
+  customerName: string;
+  customerEmail: string;
+  amount: number;
+  commission: number;
+  status: 'PENDING' | 'COMPLETED' | 'CANCELLED';
+  saleDate: string;
+  product: string;
+  notes?: string;
+}
 
 export default function MySalesPage() {
   const params = useParams<{ teamId: string }>();
-  const teamId = params?.teamId;
-  const user = useUser({ or: 'redirect' });
-  const { hasPermission } = useRolePermissions();
-  
-  if (!teamId || !hasPermission(teamId, PERMISSIONS.VIEW_OWN_SALES)) {
-    redirect(`/dashboard/${teamId || ''}`);
-  }
-  
-  // Mock sales data - in production, fetch from your API
-  const salesData = {
-    thisMonth: 12500,
-    lastMonth: 10200,
-    thisYear: 145000,
-    target: 150000,
-    recentSales: [
-      { id: '1', customer: 'John Doe', amount: 2500, date: '2024-01-20', product: 'Premium Package' },
-      { id: '2', customer: 'Jane Smith', amount: 1800, date: '2024-01-18', product: 'Standard Package' },
-      { id: '3', customer: 'Bob Johnson', amount: 3200, date: '2024-01-15', product: 'Enterprise Package' },
-    ]
+  const { data: session } = useSession();
+  const [sales, setSales] = useState<Sale[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [opened, { open, close }] = useDisclosure(false);
+  const [editingSale, setEditingSale] = useState<Sale | null>(null);
+
+  const [formData, setFormData] = useState({
+    customerName: '',
+    customerEmail: '',
+    amount: 0,
+    product: '',
+    status: 'PENDING' as 'PENDING' | 'COMPLETED' | 'CANCELLED',
+    notes: ''
+  });
+
+  useEffect(() => {
+    loadSales();
+  }, []);
+
+  const loadSales = async () => {
+    try {
+      setLoading(true);
+      
+      // Mock data for immediate display
+      const mockSales: Sale[] = [
+        {
+          id: '1',
+          customerName: 'Emma Thompson',
+          customerEmail: 'emma@example.com',
+          amount: 2500,
+          commission: 375,
+          status: 'COMPLETED',
+          saleDate: '2024-01-15',
+          product: 'Premium Package',
+          notes: 'Upgrade from basic plan'
+        },
+        {
+          id: '2',
+          customerName: 'James Rodriguez',
+          customerEmail: 'james@example.com',
+          amount: 1800,
+          commission: 270,
+          status: 'COMPLETED',
+          saleDate: '2024-01-12',
+          product: 'Standard Package',
+          notes: 'New customer referral'
+        },
+        {
+          id: '3',
+          customerName: 'Sophia Chen',
+          customerEmail: 'sophia@example.com',
+          amount: 3200,
+          commission: 480,
+          status: 'PENDING',
+          saleDate: '2024-01-10',
+          product: 'Enterprise Package',
+          notes: 'Waiting for approval'
+        },
+        {
+          id: '4',
+          customerName: 'Michael Johnson',
+          customerEmail: 'michael@example.com',
+          amount: 1200,
+          commission: 180,
+          status: 'COMPLETED',
+          saleDate: '2024-01-08',
+          product: 'Basic Package'
+        }
+      ];
+      
+      setSales(mockSales);
+    } catch (error) {
+      console.error('Error loading sales:', error);
+      setSales([]);
+    } finally {
+      setLoading(false);
+    }
   };
-  
-  const monthlyGrowth = ((salesData.thisMonth - salesData.lastMonth) / salesData.lastMonth * 100).toFixed(1);
-  const targetProgress = (salesData.thisYear / salesData.target * 100).toFixed(1);
-  
+
+  const handleEdit = (sale: Sale) => {
+    setEditingSale(sale);
+    setFormData({
+      customerName: sale.customerName,
+      customerEmail: sale.customerEmail,
+      amount: sale.amount,
+      product: sale.product,
+      status: sale.status,
+      notes: sale.notes || ''
+    });
+    open();
+  };
+
+  const handleAdd = () => {
+    setEditingSale(null);
+    setFormData({
+      customerName: '',
+      customerEmail: '',
+      amount: 0,
+      product: '',
+      status: 'PENDING',
+      notes: ''
+    });
+    open();
+  };
+
+  const handleSubmit = () => {
+    const commission = formData.amount * 0.15; // 15% commission
+    
+    notifications.show({
+      title: editingSale ? 'Sale Updated' : 'Sale Added',
+      message: `Sale for ${formData.customerName} has been ${editingSale ? 'updated' : 'recorded'} successfully.`,
+      color: 'green',
+    });
+    close();
+    // In real app, would make API call here
+    loadSales();
+  };
+
+  const handleDelete = (sale: Sale) => {
+    notifications.show({
+      title: 'Sale Deleted',
+      message: `Sale for ${sale.customerName} has been removed.`,
+      color: 'red',
+    });
+    // In real app, would make API call here
+    setSales(sales.filter(s => s.id !== sale.id));
+  };
+
+  // Calculate statistics
+  const totalSales = sales.reduce((sum, sale) => sum + (sale.status === 'COMPLETED' ? sale.amount : 0), 0);
+  const totalCommission = sales.reduce((sum, sale) => sum + (sale.status === 'COMPLETED' ? sale.commission : 0), 0);
+  const completedSales = sales.filter(s => s.status === 'COMPLETED').length;
+  const pendingSales = sales.filter(s => s.status === 'PENDING').length;
+  const monthlyTarget = 50000;
+  const targetProgress = Math.round((totalSales / monthlyTarget) * 100);
+
+  const rows = sales.map((sale) => (
+    <Table.Tr key={sale.id}>
+      <Table.Td>
+        <Group gap="sm">
+          <Avatar color="initials" name={sale.customerName} />
+          <div>
+            <Text size="sm" fw={500}>
+              {sale.customerName}
+            </Text>
+            <Text size="xs" c="dimmed">
+              {sale.customerEmail}
+            </Text>
+          </div>
+        </Group>
+      </Table.Td>
+      <Table.Td>
+        <Text size="sm">{sale.product}</Text>
+      </Table.Td>
+      <Table.Td>
+        <Text size="sm" fw={500}>${sale.amount.toLocaleString()}</Text>
+      </Table.Td>
+      <Table.Td>
+        <Text size="sm" c="green">${sale.commission.toLocaleString()}</Text>
+      </Table.Td>
+      <Table.Td>
+        <Badge 
+          color={
+            sale.status === 'COMPLETED' ? 'green' : 
+            sale.status === 'PENDING' ? 'yellow' : 'red'
+          }
+        >
+          {sale.status}
+        </Badge>
+      </Table.Td>
+      <Table.Td>
+        <Text size="xs" c="dimmed">
+          {new Date(sale.saleDate).toLocaleDateString()}
+        </Text>
+      </Table.Td>
+      <Table.Td>
+        <Group gap={5}>
+          <ActionIcon variant="subtle" onClick={() => handleEdit(sale)}>
+            <IconEdit size={16} />
+          </ActionIcon>
+          <ActionIcon variant="subtle" color="red" onClick={() => handleDelete(sale)}>
+            <IconTrash size={16} />
+          </ActionIcon>
+          <ActionIcon variant="subtle" color="blue">
+            <IconEye size={16} />
+          </ActionIcon>
+        </Group>
+      </Table.Td>
+    </Table.Tr>
+  ));
+
   return (
-    <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">My Sales Performance</h1>
-        <p className="text-gray-600 dark:text-gray-400">
-          Track your personal sales metrics and performance
-        </p>
+    <>
+      <div className="p-6 space-y-6">
+        <div>
+          <Text size="xl" fw={700} mb="xs">My Sales</Text>
+          <Text c="dimmed">
+            Track your sales performance and commission earnings
+          </Text>
+        </div>
+
+        {/* Statistics Cards */}
+        <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} spacing="md">
+          <Paper p="md" withBorder>
+            <Group justify="space-between">
+              <div>
+                <Text c="dimmed" size="sm" fw={500} tt="uppercase">
+                  Total Sales
+                </Text>
+                <Text fw={700} size="xl">
+                  ${totalSales.toLocaleString()}
+                </Text>
+              </div>
+              <ThemeIcon color="green" variant="light" size={38} radius="md">
+                <IconCoin size={20} />
+              </ThemeIcon>
+            </Group>
+            <Text c="dimmed" size="sm" mt="md">
+              <Text component="span" c="green" fw={700}>
+                +12%
+              </Text>{' '}
+              from last month
+            </Text>
+          </Paper>
+
+          <Paper p="md" withBorder>
+            <Group justify="space-between">
+              <div>
+                <Text c="dimmed" size="sm" fw={500} tt="uppercase">
+                  Commission Earned
+                </Text>
+                <Text fw={700} size="xl">
+                  ${totalCommission.toLocaleString()}
+                </Text>
+              </div>
+              <ThemeIcon color="blue" variant="light" size={38} radius="md">
+                <IconTrendingUp size={20} />
+              </ThemeIcon>
+            </Group>
+            <Text c="dimmed" size="sm" mt="md">
+              15% commission rate
+            </Text>
+          </Paper>
+
+          <Paper p="md" withBorder>
+            <Group justify="space-between">
+              <div>
+                <Text c="dimmed" size="sm" fw={500} tt="uppercase">
+                  Completed Sales
+                </Text>
+                <Text fw={700} size="xl">
+                  {completedSales}
+                </Text>
+              </div>
+              <Badge color="green" size="lg">
+                {pendingSales} Pending
+              </Badge>
+            </Group>
+          </Paper>
+
+          <Paper p="md" withBorder>
+            <Group justify="space-between">
+              <div>
+                <Text c="dimmed" size="sm" fw={500} tt="uppercase">
+                  Target Progress
+                </Text>
+                <Text fw={700} size="xl">
+                  {targetProgress}%
+                </Text>
+              </div>
+              <RingProgress
+                size={60}
+                roundCaps
+                thickness={8}
+                sections={[{ value: targetProgress, color: targetProgress >= 75 ? 'green' : targetProgress >= 50 ? 'yellow' : 'red' }]}
+                label={
+                  <Center>
+                    <IconTarget size={16} />
+                  </Center>
+                }
+              />
+            </Group>
+          </Paper>
+        </SimpleGrid>
+
+        {/* Sales Table */}
+        <Paper p="md" withBorder>
+          <Group justify="space-between" mb="md">
+            <Text size="lg" fw={500}>Sales History</Text>
+            <Button leftSection={<IconPlus size={16} />} onClick={handleAdd}>
+              Record Sale
+            </Button>
+          </Group>
+          
+          <div style={{ position: 'relative' }}>
+            <LoadingOverlay visible={loading} />
+            
+            {!loading && sales.length === 0 ? (
+              <Center py={60}>
+                <Stack align="center" gap="md">
+                  <IconShoppingCart size={48} color="gray" />
+                  <Text c="dimmed">No sales recorded yet. Record your first sale to get started.</Text>
+                  <Button onClick={handleAdd}>Record Sale</Button>
+                </Stack>
+              </Center>
+            ) : (
+              <Table striped highlightOnHover>
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th>Customer</Table.Th>
+                    <Table.Th>Product</Table.Th>
+                    <Table.Th>Amount</Table.Th>
+                    <Table.Th>Commission</Table.Th>
+                    <Table.Th>Status</Table.Th>
+                    <Table.Th>Date</Table.Th>
+                    <Table.Th>Actions</Table.Th>
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>{rows}</Table.Tbody>
+              </Table>
+            )}
+          </div>
+        </Paper>
       </div>
-      
-      {/* Sales Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">This Month</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">${salesData.thisMonth.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">
-              +{monthlyGrowth}% from last month
-            </p>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">This Year</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">${salesData.thisYear.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">
-              Year to date
-            </p>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Target Progress</CardTitle>
-            <Target className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{targetProgress}%</div>
-            <p className="text-xs text-muted-foreground">
-              of ${salesData.target.toLocaleString()} target
-            </p>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Avg. Deal Size</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">$2,167</div>
-            <p className="text-xs text-muted-foreground">
-              Last 30 days
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-      
-      {/* Progress Bar for Annual Target */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Annual Target Progress</CardTitle>
-          <CardDescription>
-            Your progress towards the ${salesData.target.toLocaleString()} annual target
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700">
-            <div 
-              className="bg-blue-600 h-2.5 rounded-full" 
-              style={{ width: `${Math.min(Number(targetProgress), 100)}%` }}
-            ></div>
-          </div>
-          <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400 mt-2">
-            <span>$0</span>
-            <span>${salesData.thisYear.toLocaleString()} / ${salesData.target.toLocaleString()}</span>
-          </div>
-        </CardContent>
-      </Card>
-      
-      {/* Recent Sales */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent Sales</CardTitle>
-          <CardDescription>
-            Your latest sales transactions
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left p-2">Customer</th>
-                  <th className="text-left p-2">Product</th>
-                  <th className="text-left p-2">Amount</th>
-                  <th className="text-left p-2">Date</th>
-                  <th className="text-left p-2">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {salesData.recentSales.map((sale) => (
-                  <tr key={sale.id} className="border-b hover:bg-gray-50 dark:hover:bg-gray-800">
-                    <td className="p-2 font-medium">{sale.customer}</td>
-                    <td className="p-2">{sale.product}</td>
-                    <td className="p-2 text-green-600 font-semibold">${sale.amount.toLocaleString()}</td>
-                    <td className="p-2">{new Date(sale.date).toLocaleDateString()}</td>
-                    <td className="p-2">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">
-                        Completed
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+
+      {/* Add/Edit Modal */}
+      <Modal opened={opened} onClose={close} title={editingSale ? "Edit Sale" : "Record Sale"} size="md">
+        <Stack gap="md">
+          <Group grow>
+            <TextInput
+              label="Customer Name"
+              placeholder="Enter customer name"
+              value={formData.customerName}
+              onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
+              required
+            />
+            <TextInput
+              label="Customer Email"
+              placeholder="Enter email"
+              value={formData.customerEmail}
+              onChange={(e) => setFormData({ ...formData, customerEmail: e.target.value })}
+              required
+            />
+          </Group>
+          
+          <Group grow>
+            <TextInput
+              label="Product/Service"
+              placeholder="Enter product name"
+              value={formData.product}
+              onChange={(e) => setFormData({ ...formData, product: e.target.value })}
+              required
+            />
+            <NumberInput
+              label="Sale Amount"
+              placeholder="Enter amount"
+              value={formData.amount}
+              onChange={(value) => setFormData({ ...formData, amount: typeof value === 'number' ? value : 0 })}
+              min={0}
+              prefix="$"
+              thousandSeparator=","
+              required
+            />
+          </Group>
+          
+          <Select
+            label="Status"
+            value={formData.status}
+            onChange={(value) => setFormData({ ...formData, status: (value as any) || 'PENDING' })}
+            data={[
+              { value: 'PENDING', label: 'Pending' },
+              { value: 'COMPLETED', label: 'Completed' },
+              { value: 'CANCELLED', label: 'Cancelled' },
+            ]}
+            required
+          />
+          
+          <TextInput
+            label="Notes (Optional)"
+            placeholder="Additional notes"
+            value={formData.notes}
+            onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+          />
+          
+          {formData.amount > 0 && (
+            <Paper p="sm" withBorder bg="gray.0">
+              <Text size="sm" c="dimmed">
+                Estimated Commission (15%): <Text component="span" fw={500} c="green">${(formData.amount * 0.15).toLocaleString()}</Text>
+              </Text>
+            </Paper>
+          )}
+          
+          <Group justify="flex-end" gap="sm" mt="md">
+            <Button variant="outline" onClick={close}>Cancel</Button>
+            <Button onClick={handleSubmit}>
+              {editingSale ? 'Update Sale' : 'Record Sale'}
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+    </>
   );
 }

@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { stackServerApp } from '@/stack'
+import { getServerSession } from 'next-auth/next'
+import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 
 export async function POST(req: NextRequest) {
   try {
-    const user = await stackServerApp.getUser()
-    if (!user) {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -15,7 +16,7 @@ export async function POST(req: NextRequest) {
     const existingReferral = await prisma.referralRelationship.findUnique({
       where: {
         referrerId_referredId: {
-          referrerId: user.id,
+          referrerId: session.user.id,
           referredId: referredUserId
         }
       }
@@ -28,7 +29,7 @@ export async function POST(req: NextRequest) {
     // Create referral relationship
     const referral = await prisma.referralRelationship.create({
       data: {
-        referrerId: user.id,
+        referrerId: session.user.id,
         referredId: referredUserId,
         level: 1,
         status: 'PENDING'
@@ -39,7 +40,7 @@ export async function POST(req: NextRequest) {
     })
 
     // Create multi-tier referrals (up to 5 levels)
-    await createMultiTierReferrals(user.id, referredUserId)
+    await createMultiTierReferrals(session.user.id, referredUserId)
 
     return NextResponse.json({ 
       success: true, 
