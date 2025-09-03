@@ -45,9 +45,18 @@ function AuthButtonsInner() {
   const { data: session } = useSession();
 
   if (session) {
+    // Check if user is super admin and redirect accordingly
+    const getDashboardUrl = () => {
+      // Check if this is a super admin session
+      if (session.user?.role === 'SUPER_ADMIN') {
+        return '/admin-panel';
+      }
+      return '/dashboard';
+    };
+
     return (
       <Link
-        href="/dashboard"
+        href={getDashboardUrl()}
         className={buttonVariants({ variant: "default" })}
       >
         Dashboard
