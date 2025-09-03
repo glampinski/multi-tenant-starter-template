@@ -107,3 +107,18 @@
     transform: translateX(0%);
   }
 }
+
+/* Hide browser extension elements that cause hydration issues */
+[data-lastpass-icon-root],
+[data-lastpass-overlay],
+[data-bitwarden-watching],
+[data-1p-ignore],
+.__web-inspector-hide-shortcut__,
+[data-protonpass-role],
+div[style*="position: relative; height: 0px; width: 0px; float: left"],
+div[style*="position: absolute; top: 0px; left: 0px; z-index: 2147483647"] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
