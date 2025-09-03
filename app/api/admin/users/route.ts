@@ -1,0 +1,90 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { prisma } from '@/lib/prisma'
+import { getServerSession } from 'next-auth/next'
+import { authOptions } from '@/app/api/auth/[...nextauth]/route'
+
+// GET: Fetch all users (Super Admin only)
+export async function GET(req: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions)
+    
+    // Check if user is super admin
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Get user profile to check role
+    const userProfile = await prisma.userProfile.findUnique({
+      where: { id: session.user.id },
+      select: { role: true }
+    })
+
+    if (userProfile?.role !== 'SUPER_ADMIN') {
+      return NextResponse.json({ error: 'Forbidden - Super Admin access required' }, { status: 403 })
+    }
+
+    const { searchParams } = new URL(req.url)
+    const page = parseInt(searchParams.get('page') || '1')
+    const limit = parseInt(searchParams.get('limit') || '50')
+    const search = searchParams.get('search') || ''
+
+    const skip = (page - 1) * limit
+
+    // Build where clause
+    const where: any = {}
+    
+    if (search) {
+      where.OR = [
+        { firstName: { contains: search, mode: 'insensitive' } },
+        { lastName: { contains: search, mode: 'insensitive' } },
+        { email: { contains: search, mode: 'insensitive' } },
+        { username: { contains: search, mode: 'insensitive' } }
+      ]
+    }
+
+    // Fetch users with pagination
+    const [users, totalCount] = await Promise.all([
+      prisma.userProfile.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          username: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          role: true,
+          teamId: true,
+          createdAt: true,
+          updatedAt: true,
+          referralCode: true,
+          lastLoginAt: true
+        }
+      }),
+      prisma.userProfile.count({ where })
+    ])
+
+    const totalPages = Math.ceil(totalCount / limit)
+
+    return NextResponse.json({
+      users,
+      pagination: {
+        page,
+        limit,
+        totalCount,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1
+      }
+    })
+
+  } catch (error) {
+    console.error('Error fetching users:', error)
+    return NextResponse.json(
+      { error: 'Failed to fetch users' },
+      { status: 500 }
+    )
+  }
+}

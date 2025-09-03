@@ -70,6 +70,49 @@ export const authOptions: NextAuthOptions = {
         accountType: account?.type 
       });
       return true;
+    },
+    async redirect({ url, baseUrl }) {
+      console.log('🔄 Redirect callback:', { url, baseUrl });
+      
+      // Handle role-based redirects after successful authentication
+      if (url.startsWith(baseUrl)) {
+        // Extract callbackUrl from the redirect URL if present
+        const urlObj = new URL(url);
+        const callbackUrl = urlObj.searchParams.get('callbackUrl');
+        
+        if (callbackUrl) {
+          const decodedCallbackUrl = decodeURIComponent(callbackUrl);
+          console.log('📍 Found callbackUrl:', decodedCallbackUrl);
+          
+          // For role-based redirects, we need to check user role
+          // We'll intercept dashboard redirects and redirect SUPER_ADMIN to admin-panel
+          if (decodedCallbackUrl.includes('/dashboard')) {
+            // Get user email from the current URL context if available
+            const emailParam = urlObj.searchParams.get('email');
+            if (emailParam) {
+              try {
+                const userProfile = await prisma.userProfile.findFirst({
+                  where: { email: emailParam },
+                });
+                
+                if (userProfile?.role === 'SUPER_ADMIN') {
+                  console.log('🔄 Redirecting SUPER_ADMIN to admin panel');
+                  return `${baseUrl}/admin-panel`;
+                }
+              } catch (error) {
+                console.error('❌ Error checking user role for redirect:', error);
+              }
+            }
+          }
+          
+          return decodedCallbackUrl;
+        }
+      }
+      
+      // Default redirect logic
+      if (url.startsWith('/')) return `${baseUrl}${url}`;
+      if (new URL(url).origin === baseUrl) return url;
+      return baseUrl;
     }
   },
   events: {

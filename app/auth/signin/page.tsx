@@ -25,9 +25,29 @@ export default function SignIn() {
     const email = formData.get('email') as string
     
     try {
+      // Check user role to determine the correct redirect URL
+      let callbackUrl = '/dashboard/main_team'; // default for regular users
+      
+      try {
+        const roleCheckResponse = await fetch('/api/auth/check-role', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email })
+        });
+        
+        if (roleCheckResponse.ok) {
+          const { role } = await roleCheckResponse.json();
+          if (role === 'SUPER_ADMIN') {
+            callbackUrl = '/admin-panel';
+          }
+        }
+      } catch (error) {
+        console.log('Could not check role, using default redirect');
+      }
+      
       const result = await signIn('email', { 
         email, 
-        callbackUrl: '/dashboard/main_team',
+        callbackUrl,
         redirect: false // Handle redirect manually for better UX
       })
       
