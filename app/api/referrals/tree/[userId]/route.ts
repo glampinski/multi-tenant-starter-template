@@ -19,7 +19,6 @@ export async function GET(req: NextRequest, { params }: { params: { userId: stri
         referred: {
           select: {
             id: true,
-            stackUserId: true,
             username: true,
             firstName: true,
             lastName: true,
@@ -122,7 +121,6 @@ async function buildReferralTree(userId: string, level: number = 1): Promise<any
       referred: {
         select: {
           id: true,
-          stackUserId: true,
           username: true,
           firstName: true,
           lastName: true,

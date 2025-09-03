@@ -3,6 +3,74 @@ import { MODULES, ACTIONS, ROLES, type ModuleType, type ActionType } from '../ty
 
 const prisma = new PrismaClient();
 
+// Re-export needed constants
+export { MODULES, ACTIONS, ROLES } from '../types/permissions';
+
+// Create a PERMISSIONS object for easier access
+export const PERMISSIONS = {
+  MODULES,
+  ACTIONS,
+  ROLES
+};
+
+// Role permission mapping
+export const ROLE_PERMISSIONS = {
+  [ROLES.SUPER_ADMIN]: ['*'], // All permissions
+  [ROLES.ADMIN]: [
+    `${MODULES.CUSTOMERS}.${ACTIONS.VIEW}`,
+    `${MODULES.CUSTOMERS}.${ACTIONS.CREATE}`,
+    `${MODULES.CUSTOMERS}.${ACTIONS.EDIT}`,
+    `${MODULES.SALES}.${ACTIONS.VIEW}`,
+    `${MODULES.SALES}.${ACTIONS.CREATE}`,
+    `${MODULES.REFERRALS}.${ACTIONS.VIEW}`,
+    `${MODULES.ANALYTICS}.${ACTIONS.VIEW}`,
+    `${MODULES.TEAM_MANAGEMENT}.${ACTIONS.MANAGE}`,
+    `${MODULES.SETTINGS}.${ACTIONS.MANAGE}`
+  ],
+  [ROLES.EMPLOYEE]: [
+    `${MODULES.CUSTOMERS}.${ACTIONS.VIEW}`,
+    `${MODULES.SALES}.${ACTIONS.VIEW}`,
+    `${MODULES.REFERRALS}.${ACTIONS.VIEW}`,
+    `${MODULES.ANALYTICS}.${ACTIONS.VIEW}`
+  ],
+  [ROLES.SALES_PERSON]: [
+    `${MODULES.CUSTOMERS}.${ACTIONS.VIEW}`,
+    `${MODULES.CUSTOMERS}.${ACTIONS.CREATE}`,
+    `${MODULES.CUSTOMERS}.${ACTIONS.EDIT}`,
+    `${MODULES.SALES}.${ACTIONS.VIEW}`,
+    `${MODULES.SALES}.${ACTIONS.CREATE}`,
+    `${MODULES.REFERRALS}.${ACTIONS.VIEW}`,
+    `${MODULES.ANALYTICS}.${ACTIONS.VIEW}`
+  ],
+  [ROLES.CUSTOMER]: [
+    `${MODULES.DASHBOARD}.${ACTIONS.VIEW}`,
+    `${MODULES.REFERRALS}.${ACTIONS.VIEW}`
+  ]
+};
+
+// Helper functions for role display
+export function getRoleDisplayName(role: string): string {
+  switch (role) {
+    case ROLES.SUPER_ADMIN: return 'Super Admin';
+    case ROLES.ADMIN: return 'Admin';
+    case ROLES.EMPLOYEE: return 'Employee';
+    case ROLES.SALES_PERSON: return 'Sales Person';
+    case ROLES.CUSTOMER: return 'Customer';
+    default: return role;
+  }
+}
+
+export function getRoleDescription(role: string): string {
+  switch (role) {
+    case ROLES.SUPER_ADMIN: return 'Full system access and control';
+    case ROLES.ADMIN: return 'Manage teams, users, and business operations';
+    case ROLES.EMPLOYEE: return 'View customer data and analytics';
+    case ROLES.SALES_PERSON: return 'Manage customers and sales activities';
+    case ROLES.CUSTOMER: return 'Access personal dashboard and referrals';
+    default: return 'Standard user access';
+  }
+}
+
 /**
  * Check if a user has a specific permission
  */
@@ -15,7 +83,7 @@ export async function hasPermission(
   try {
     // Get user's role
     const userProfile = await prisma.userProfile.findUnique({
-      where: { stackUserId: userId }
+      where: { id: userId }
     });
 
     if (!userProfile) return false;
@@ -76,7 +144,7 @@ export async function hasPermission(
 export async function getUserPermissions(userId: string, teamId: string) {
   try {
     const userProfile = await prisma.userProfile.findUnique({
-      where: { stackUserId: userId }
+      where: { id: userId }
     });
 
     if (!userProfile) return { rolePermissions: [], customPermissions: [], deniedPermissions: [] };
@@ -315,8 +383,8 @@ export async function canImpersonate(
 
     // Get both user profiles
     const [impersonator, target] = await Promise.all([
-      prisma.userProfile.findUnique({ where: { stackUserId: impersonatorId } }),
-      prisma.userProfile.findUnique({ where: { stackUserId: targetUserId } })
+      prisma.userProfile.findUnique({ where: { id: impersonatorId } }),
+      prisma.userProfile.findUnique({ where: { id: targetUserId } })
     ]);
 
     if (!impersonator || !target) return false;
@@ -326,12 +394,14 @@ export async function canImpersonate(
 
     // Admin can impersonate employees, sales people, and customers
     if (impersonator.role === UserRole.ADMIN) {
-      return [UserRole.EMPLOYEE, UserRole.SALES_PERSON, UserRole.CUSTOMER].includes(target.role);
+      const allowedRoles = [UserRole.EMPLOYEE, UserRole.SALES_PERSON, UserRole.CUSTOMER];
+      return allowedRoles.some(role => role === target.role);
     }
 
     // Employee can impersonate sales people and customers
     if (impersonator.role === UserRole.EMPLOYEE) {
-      return [UserRole.SALES_PERSON, UserRole.CUSTOMER].includes(target.role);
+      const allowedRoles = [UserRole.SALES_PERSON, UserRole.CUSTOMER];
+      return allowedRoles.some(role => role === target.role);
     }
 
     return false;
@@ -364,49 +434,5 @@ export const LEGACY_PERMISSIONS = {
   VIEW_OWN_DASHBOARD: 'view_own_dashboard',
   INVITE_OTHER_CUSTOMERS: 'invite_other_customers'
 } as const;
-
-export function getRoleDisplayName(role: string): string {
-  switch (role) {
-    case 'super_admin':
-    case 'SUPER_ADMIN':
-      return '🔑 Super Admin';
-    case 'admin':
-    case 'ADMIN':
-      return '⚡ Admin';
-    case 'employee':
-    case 'EMPLOYEE':
-      return '👤 Employee';
-    case 'sales_person':
-    case 'SALES_PERSON':
-      return '💼 Salesperson';
-    case 'customer':
-    case 'CUSTOMER':
-      return '🛒 Customer';
-    default:
-      return 'Unknown Role';
-  }
-}
-
-export function getRoleDescription(role: string): string {
-  switch (role) {
-    case 'super_admin':
-    case 'SUPER_ADMIN':
-      return 'Full access to all data, users, and system configuration';
-    case 'admin':
-    case 'ADMIN':
-      return 'Manage company users, view company data, configure company settings';
-    case 'employee':
-    case 'EMPLOYEE':
-      return 'Access to assigned data and tasks only';
-    case 'sales_person':
-    case 'SALES_PERSON':
-      return 'View own customers and sales, can invite customers';
-    case 'customer':
-    case 'CUSTOMER':
-      return 'Basic dashboard access, can invite other customers';
-    default:
-      return 'No description available';
-  }
-}
 
 export { prisma };

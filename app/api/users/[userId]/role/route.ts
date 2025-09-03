@@ -14,7 +14,7 @@ export async function GET(
 
     // Get user role from database
     const userProfile = await prisma.userProfile.findUnique({
-      where: { stackUserId: userId },
+      where: { id: userId },
       select: { role: true, firstName: true, lastName: true, email: true }
     });
 

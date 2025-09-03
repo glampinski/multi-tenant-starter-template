@@ -84,3 +84,48 @@ export async function sendVerificationRequest({
     throw error;
   }
 }
+
+export async function sendEmail({
+  to,
+  subject,
+  html,
+}: {
+  to: string;
+  subject: string;
+  html: string;
+}): Promise<void> {
+  console.log('🔍 sendEmail called with:', { to, subject });
+  
+  try {
+    // Validate inputs
+    if (!to) {
+      throw new Error('Recipient email is required');
+    }
+    
+    if (!subject) {
+      throw new Error('Email subject is required');
+    }
+    
+    if (!html) {
+      throw new Error('Email content is required');
+    }
+    
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(to)) {
+      throw new Error(`Invalid email format: ${to}`);
+    }
+    
+    const data = await resend.emails.send({
+      from: 'noreply@yourapp.com',
+      to,
+      subject,
+      html,
+    });
+    
+    console.log('✅ Email sent successfully:', data);
+  } catch (error) {
+    console.error('💥 Failed to send email:', error);
+    throw error;
+  }
+}

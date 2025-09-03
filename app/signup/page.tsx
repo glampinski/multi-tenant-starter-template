@@ -45,22 +45,34 @@ export default function SignUpPage() {
       
       const callbackUrl = `/welcome?${params.toString()}`;
       
-      // Trigger magic link authentication
-      const result = await signIn('email', {
-        email,
-        callbackUrl,
-        redirect: false
+      // Use the new secure magic link API
+      const response = await fetch('/api/auth/magic-link/send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email,
+          intent: token ? 'invite' : 'signup',
+          callbackUrl,
+          inviteToken: token || undefined
+        }),
       });
 
-      if (result?.error) {
-        setError('Failed to send signup email. Please try again.');
-      } else {
-        // Redirect to email verification page
-        router.push(`/auth/verify-request?email=${encodeURIComponent(email)}&signup=true`);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to send magic link');
       }
+
+      // Show success message
+      setError(''); // Clear any previous errors
+      // Redirect to a success page or show success message
+      router.push(`/auth/verify-request?email=${encodeURIComponent(email)}&type=${token ? 'invite' : 'signup'}`);
+      
     } catch (error) {
       console.error('Signup error:', error);
-      setError('Something went wrong. Please try again.');
+      setError(error instanceof Error ? error.message : 'An unexpected error occurred');
     } finally {
       setIsLoading(false);
     }

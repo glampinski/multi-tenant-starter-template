@@ -66,8 +66,11 @@ model UserProfile {
   // Relations
   referrer           UserProfile?           @relation("UserReferrals", fields: [referrerId], references: [id])
   referrals          UserProfile[]          @relation("UserReferrals")
-  sentInvites        Invite[]               @relation("UserInvites")
+  sentSecureInvites  InviteToken[]          @relation("SecureUserInvites")
   userPermissions    UserPermission[]       // User-specific permissions
+  mfaDevices         MFADevice[]            // MFA devices
+  auditLogs          SecurityAuditLog[]     // Security audit trail
+  stepUpSessions     StepUpSession[]        // Step-up authentication sessions
   
   referralsGiven     ReferralRelationship[] @relation("Referrer")
   referralsReceived  ReferralRelationship[] @relation("Referred")
@@ -78,20 +81,149 @@ model UserProfile {
   @@map("user_profiles")
 }
 
-// NextAuth invitation system
-model Invite {
-  id          String   @id @default(cuid())
-  token       String   @unique
-  email       String
-  role        UserRole @default(CUSTOMER)
-  invitedBy   String   // referrer user ID
-  expiresAt   DateTime
-  usedAt      DateTime?
-  createdAt   DateTime @default(now())
+// Secure Magic Link Token System
+model MagicLinkToken {
+  id              String   @id @default(cuid())
+  hashedToken     String   @unique
+  email           String
+  intent          String   // 'signin', 'invite', 'password-reset'
+  userAgent       String?
+  ipAddress       String?
+  inviteTokenId   String?  // Link to invite for invite-only validation
+  expiresAt       DateTime // Should be 5-10 minutes from creation
+  used            Boolean  @default(false)
+  usedAt          DateTime? // When the token was consumed
+  sessionId       String?  // Track session for rotation
+  createdAt       DateTime @default(now())
   
-  inviter     UserProfile @relation("UserInvites", fields: [invitedBy], references: [id])
+  // Relations
+  inviteToken     InviteToken? @relation(fields: [inviteTokenId], references: [id])
   
-  @@map("invites")
+  @@map("magic_link_tokens")
+  @@index([email, used, expiresAt])
+  @@index([hashedToken])
+  @@index([email, createdAt]) // For counting active tokens per user
+}
+
+// Secure Invite Token System (replacement for Invite)
+model InviteToken {
+  id              String   @id @default(cuid())
+  token           String   @unique
+  email           String?  // Optional pre-filled email
+  role            UserRole @default(CUSTOMER)
+  invitedBy       String   // referrer user ID
+  expiresAt       DateTime
+  used            Boolean  @default(false)
+  maxUses         Int      @default(1)
+  currentUses     Int      @default(0)
+  createdAt       DateTime @default(now())
+  
+  // Relations
+  inviter         UserProfile @relation("SecureUserInvites", fields: [invitedBy], references: [id])
+  magicLinkTokens MagicLinkToken[]
+  
+  @@map("invite_tokens")
+  @@index([token, used, expiresAt])
+}
+
+// Rate Limiting for Magic Link Requests
+model MagicLinkRateLimit {
+  id              String   @id @default(cuid())
+  identifier      String   // email or IP
+  type            String   // 'email' or 'ip'
+  action          String   // 'request' or 'resend'
+  requestCount    Int      @default(1)
+  windowStart     DateTime @default(now())
+  lastRequest     DateTime @default(now())
+  
+  @@map("magic_link_rate_limits")
+  @@unique([identifier, type, action])
+  @@index([identifier, type, action, windowStart])
+}
+
+// Active Token Tracking (for capping tokens per user)
+model ActiveTokenCount {
+  id              String   @id @default(cuid())
+  email           String   @unique
+  activeCount     Int      @default(0)
+  maxAllowed      Int      @default(3) // Max 3 active tokens per email
+  lastUpdated     DateTime @default(now())
+  
+  @@map("active_token_counts")
+  @@index([email])
+}
+
+// Step-up Authentication for Sensitive Operations
+model StepUpSession {
+  id              String   @id @default(cuid())
+  userId          String   // UserProfile ID
+  sessionToken    String   @unique
+  operation       String   // 'payout', 'role_change', 'account_delete', etc.
+  mfaMethod       String   // 'totp', 'webauthn'
+  verified        Boolean  @default(false)
+  expiresAt       DateTime // Short-lived (15-30 minutes)
+  ipAddress       String?
+  userAgent       String?
+  
+  // Timestamps
+  createdAt       DateTime @default(now())
+  verifiedAt      DateTime?
+  
+  // Relations
+  user            UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("step_up_sessions")
+  @@index([userId, operation])
+  @@index([sessionToken])
+  @@index([expiresAt])
+}
+
+// MFA (Multi-Factor Authentication) System
+model MFADevice {
+  id              String   @id @default(cuid())
+  userId          String   // UserProfile ID
+  type            String   // 'totp', 'webauthn'
+  name            String   // User-friendly device name
+  secret          String?  // TOTP secret (encrypted)
+  credentialId    String?  // WebAuthn credential ID
+  publicKey       String?  // WebAuthn public key
+  counter         Int?     // WebAuthn counter
+  isActive        Boolean  @default(true)
+  isBackup        Boolean  @default(false) // Backup codes
+  
+  // Timestamps
+  createdAt       DateTime @default(now())
+  lastUsedAt      DateTime?
+  
+  // Relations
+  user            UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("mfa_devices")
+  @@index([userId, type])
+}
+
+// Audit Log for Security Events
+model SecurityAuditLog {
+  id              String   @id @default(cuid())
+  userId          String?  // UserProfile ID (nullable for system events)
+  action          String   // 'login', 'logout', 'role_change', 'payout', 'mfa_setup', etc.
+  resource        String?  // What was accessed/modified
+  details         Json?    // Additional event details
+  ipAddress       String?
+  userAgent       String?
+  success         Boolean  @default(true)
+  riskLevel       String   @default("low") // 'low', 'medium', 'high'
+  
+  // Timestamps
+  createdAt       DateTime @default(now())
+  
+  // Relations
+  user            UserProfile? @relation(fields: [userId], references: [id])
+  
+  @@map("security_audit_logs")
+  @@index([userId, action, createdAt])
+  @@index([action, createdAt])
+  @@index([createdAt])
 }
 
 // NextAuth required tables
