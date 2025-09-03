@@ -9,8 +9,8 @@ interface Props {
 }
 
 export default async function UsernameReferralPage({ params, searchParams }: Props) {
-  const { username } = params;
-  const { role } = searchParams;
+  const { username } = await params;
+  const { role } = await searchParams;
 
   // For demo purposes, we'll validate against referral-enabled usernames
   // In production, you'd check your database for valid referral users
@@ -59,7 +59,7 @@ export default async function UsernameReferralPage({ params, searchParams }: Pro
 
 // Generate metadata for social sharing
 export async function generateMetadata({ params }: Props) {
-  const { username } = params;
+  const { username } = await params;
   
   return {
     title: `Join ${username} on our platform`,
