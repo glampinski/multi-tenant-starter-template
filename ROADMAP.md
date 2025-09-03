@@ -78,6 +78,7 @@
 **📊 Data Flow**: ✅ End-to-end data integration from database to UI
 
 ### **Priority 3: Authentication & Authorization** 🔥
+- [x] **Lead capture for unidentified users**: Public invitation request form
 - [ ] **Workspace isolation**: Ensure data segregation by team
 - [ ] **Permission enforcement**: Server-side permission checks
 - [ ] **Role assignment workflows**: Proper role upgrade/downgrade

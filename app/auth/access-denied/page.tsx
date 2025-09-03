@@ -63,7 +63,7 @@ export default function AccessDenied() {
               <Group grow gap="md">
                 <Button
                   component={Link}
-                  href="mailto:support@yourcompany.com?subject=Request%20Platform%20Access"
+                  href="/auth/request-invitation"
                   leftSection={<IconUserPlus size={16} />}
                   variant="filled"
                   color="blue"
