@@ -17,8 +17,55 @@ export default function Dashboard() {
       return;
     }
 
-    // Redirect to the main team dashboard
-    router.push('/dashboard/main_team');
+    // Role-based dashboard redirection
+    const redirectToDashboard = async () => {
+      try {
+        // Get user role from session or check via API
+        let userRole = session.user?.role;
+        
+        if (!userRole && session.user?.email) {
+          // Fallback: check role via API if not in session
+          const roleResponse = await fetch('/api/auth/check-role', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: session.user.email })
+          });
+          
+          if (roleResponse.ok) {
+            const { role } = await roleResponse.json();
+            userRole = role;
+          }
+        }
+        
+        // Redirect based on role
+        switch (userRole) {
+          case 'SUPER_ADMIN':
+            router.push('/admin-panel');
+            break;
+          case 'ADMIN':
+            router.push('/dashboard/admin_team');
+            break;
+          case 'EMPLOYEE':
+            router.push('/dashboard/employee_team');
+            break;
+          case 'SALES_PERSON':
+            router.push('/dashboard/sales_team');
+            break;
+          case 'CUSTOMER':
+            router.push('/dashboard/customer_team');
+            break;
+          default:
+            // Fallback to main team if role is unclear
+            router.push('/dashboard/main_team');
+        }
+      } catch (error) {
+        console.error('Error determining user role:', error);
+        // Fallback to main team on error
+        router.push('/dashboard/main_team');
+      }
+    };
+
+    redirectToDashboard();
   }, [session, status, router]);
 
   if (status === 'loading') {

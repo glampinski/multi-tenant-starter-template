@@ -26,7 +26,7 @@ export default function SignIn() {
     
     try {
       // Check user role to determine the correct redirect URL
-      let callbackUrl = '/dashboard/main_team'; // default for regular users
+      let callbackUrl = '/dashboard/main_team'; // default fallback
       
       try {
         const roleCheckResponse = await fetch('/api/auth/check-role', {
@@ -37,8 +37,26 @@ export default function SignIn() {
         
         if (roleCheckResponse.ok) {
           const { role } = await roleCheckResponse.json();
-          if (role === 'SUPER_ADMIN') {
-            callbackUrl = '/admin-panel';
+          
+          // Role-based dashboard routing
+          switch (role) {
+            case 'SUPER_ADMIN':
+              callbackUrl = '/admin-panel';
+              break;
+            case 'ADMIN':
+              callbackUrl = '/dashboard/admin_team';
+              break;
+            case 'EMPLOYEE':
+              callbackUrl = '/dashboard/employee_team';
+              break;
+            case 'SALES_PERSON':
+              callbackUrl = '/dashboard/sales_team';
+              break;
+            case 'CUSTOMER':
+              callbackUrl = '/dashboard/customer_team';
+              break;
+            default:
+              callbackUrl = '/dashboard/main_team';
           }
         }
       } catch (error) {

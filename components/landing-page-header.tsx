@@ -47,11 +47,24 @@ function AuthButtonsInner() {
   if (session) {
     // Check if user is super admin and redirect accordingly
     const getDashboardUrl = () => {
-      // Check if this is a super admin session
-      if (session.user?.role === 'SUPER_ADMIN') {
-        return '/admin-panel';
+      // Check user role for appropriate dashboard redirect
+      const userRole = session.user?.role;
+      
+      switch (userRole) {
+        case 'SUPER_ADMIN':
+          return '/admin-panel';
+        case 'ADMIN':
+          return '/dashboard/admin_team';
+        case 'EMPLOYEE':
+          return '/dashboard/employee_team';
+        case 'SALES_PERSON':
+          return '/dashboard/sales_team';
+        case 'CUSTOMER':
+          return '/dashboard/customer_team';
+        default:
+          // For users without clear role or fallback, use generic dashboard which will redirect appropriately
+          return '/dashboard';
       }
-      return '/dashboard';
     };
 
     return (
