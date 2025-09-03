@@ -375,7 +375,7 @@ export default function InvitePage() {
             onChange={(e) => setFormData({ ...formData, email: e.target.value })}
             required
             leftSection={<IconMail size={16} />}
-            disabled={!!editingInvitation} // Don't allow editing email for existing invitations
+            disabled={!!editingInvitation} // Don&apos;t allow editing email for existing invitations
           />
           
           <Select

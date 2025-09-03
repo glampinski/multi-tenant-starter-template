@@ -31,7 +31,7 @@ export function useRolePermissions(propUser?: any, propTeam?: any) {
   // If no props provided, try to get from context (may not always work)
   if (!user || !team) {
     try {
-      const { useAppUser } = require('@/hooks/useAppUser');
+      const { useAppUser } = require('@/hooks/useAppUser-simple');
       const hookResult = useAppUser();
       user = user || hookResult.user;
       team = team || hookResult.team;

@@ -1,7 +1,7 @@
-'use client';
+&apos;se client&apos;
 
-import { useRolePermissions } from '@/hooks/useRolePermissions';
-import { useParams } from 'next/navigation';
+import { useRolePermissions } from &apos;/hooks/useRolePermissions&apos;
+import { useParams } from &apos;ext/navigation&apos;
 import { 
   Paper, 
   Text, 
@@ -16,7 +16,7 @@ import {
   LoadingOverlay,
   Stack,
   Center
-} from '@mantine/core';
+} from &apos;mantine/core&apos;
 import { 
   IconTrendingUp, 
   IconCoin, 
@@ -24,8 +24,8 @@ import {
   IconTarget, 
   IconShield, 
   IconEye 
-} from '@tabler/icons-react';
-import { useEffect, useState } from 'react';
+} from &apos;tabler/icons-react&apos;
+import { useEffect, useState } from &apos;eact&apos;
 
 interface SalesData {
   id: string;
@@ -35,7 +35,7 @@ interface SalesData {
   monthlyRevenue: number;
   targetProgress: number;
   lastSale: string;
-  status: 'active' | 'inactive';
+  status: &apos;ctive&apos;| &apos;nactive&apos;
 }
 
 export default function CompanySalesPage() {
@@ -46,7 +46,7 @@ export default function CompanySalesPage() {
   const [loading, setLoading] = useState(true);
 
   // Check permissions - using a simpler approach for now
-  const canViewCompanyData = true; // We'll implement proper permissions later
+  const canViewCompanyData = true; // We&apos;l implement proper permissions later
 
   useEffect(() => {
     if (canViewCompanyData) {
@@ -61,50 +61,46 @@ export default function CompanySalesPage() {
       // Mock data for immediate display
       const mockSalesData: SalesData[] = [
         {
-          id: '1',
-          salesperson: 'Sarah Wilson',
-          email: 'sarah@company.com',
+          id: &apos;&apos;
+          salesperson: &apos;arah Wilson&apos;
+          email: &apos;arah@company.com&apos;
           customers: 24,
           monthlyRevenue: 45600,
           targetProgress: 85,
-          lastSale: '2024-01-15',
-          status: 'active'
-        },
+          lastSale: &apos;024-01-15&apos;
+          status: &apos;ctive&apos;        },
         {
-          id: '2',
-          salesperson: 'Mike Johnson',
-          email: 'mike@company.com',
+          id: &apos;&apos;
+          salesperson: &apos;ike Johnson&apos;
+          email: &apos;ike@company.com&apos;
           customers: 18,
           monthlyRevenue: 32400,
           targetProgress: 62,
-          lastSale: '2024-01-14',
-          status: 'active'
-        },
+          lastSale: &apos;024-01-14&apos;
+          status: &apos;ctive&apos;        },
         {
-          id: '3',
-          salesperson: 'Lisa Brown',
-          email: 'lisa@company.com',
+          id: &apos;&apos;
+          salesperson: &apos;isa Brown&apos;
+          email: &apos;isa@company.com&apos;
           customers: 31,
           monthlyRevenue: 58200,
           targetProgress: 95,
-          lastSale: '2024-01-16',
-          status: 'active'
-        },
+          lastSale: &apos;024-01-16&apos;
+          status: &apos;ctive&apos;        },
         {
-          id: '4',
-          salesperson: 'John Davis',
-          email: 'john@company.com',
+          id: &apos;&apos;
+          salesperson: &apos;ohn Davis&apos;
+          email: &apos;ohn@company.com&apos;
           customers: 8,
           monthlyRevenue: 12800,
           targetProgress: 25,
-          lastSale: '2024-01-08',
-          status: 'inactive'
-        }
+          lastSale: &apos;024-01-08&apos;
+          status: &apos;nactive&apos;        }
       ];
       
       setSalesData(mockSalesData);
     } catch (error) {
-      console.error('Error loading sales data:', error);
+      console.error(&apos;rror loading sales data:&apos; error);
       setSalesData([]);
     } finally {
       setLoading(false);
@@ -120,7 +116,7 @@ export default function CompanySalesPage() {
               <IconShield size={40} />
             </ThemeIcon>
             <Text size="xl" fw={600}>Access Denied</Text>
-            <Text c="dimmed">You don't have permission to view company sales data.</Text>
+            <Text c="dimmed">You undefined have permission to view company sales data.</Text>
           </Stack>
         </Center>
       </div>
@@ -162,9 +158,8 @@ export default function CompanySalesPage() {
             size="sm"
             style={{ width: 60 }}
             color={
-              sales.targetProgress >= 75 ? 'green' : 
-              sales.targetProgress >= 50 ? 'yellow' : 'red'
-            }
+              sales.targetProgress >= 75 ? &apos;reen&apos;: 
+              sales.targetProgress >= 50 ? &apos;ellow&apos;: &apos;ed&apos;            }
           />
         </Group>
       </Table.Td>
@@ -174,7 +169,7 @@ export default function CompanySalesPage() {
         </Text>
       </Table.Td>
       <Table.Td>
-        <Badge color={sales.status === 'active' ? 'green' : 'red'}>
+        <Badge color={sales.status === &apos;ctive&apos;? &apos;reen&apos;: &apos;ed&apos;>
           {sales.status}
         </Badge>
       </Table.Td>
@@ -213,7 +208,7 @@ export default function CompanySalesPage() {
           <Text c="dimmed" size="sm" mt="md">
             <Text component="span" c="green" fw={700}>
               +22%
-            </Text>{' '}
+            </Text>{&apos;&apos;
             from last month
           </Text>
         </Paper>
@@ -235,7 +230,7 @@ export default function CompanySalesPage() {
           <Text c="dimmed" size="sm" mt="md">
             <Text component="span" c="green" fw={700}>
               +15%
-            </Text>{' '}
+            </Text>{&apos;&apos;
             from last month
           </Text>
         </Paper>
@@ -257,7 +252,7 @@ export default function CompanySalesPage() {
           <Text c="dimmed" size="sm" mt="md">
             <Text component="span" c="green" fw={700}>
               Active
-            </Text>{' '}
+            </Text>{&apos;&apos;
             salespeople
           </Text>
         </Paper>
@@ -292,7 +287,7 @@ export default function CompanySalesPage() {
           </div>
         </Group>
         
-        <div style={{ position: 'relative' }}>
+        <div style={{ position: &apos;elative&apos;}}>
           <LoadingOverlay visible={loading} />
           
           {!loading && salesData.length === 0 ? (

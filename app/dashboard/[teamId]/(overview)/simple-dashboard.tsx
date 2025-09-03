@@ -1,9 +1,9 @@
-'use client';
+&apos;se client&apos;
 
-import { useParams } from 'next/navigation';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Users, TrendingUp, DollarSign, Shield } from 'lucide-react';
+import { useParams } from &apos;ext/navigation&apos;
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from &apos;/components/ui/card&apos;
+import { Badge } from &apos;/components/ui/badge&apos;
+import { Users, TrendingUp, DollarSign, Shield } from &apos;ucide-react&apos;
 
 export function RoleBasedDashboard() {
   const params = useParams<{ teamId: string }>();
@@ -12,44 +12,44 @@ export function RoleBasedDashboard() {
   // Simple role detection for now
   const getRole = () => {
     // Check dev session cookie
-    if (typeof window !== 'undefined') {
+    if (typeof window !== &apos;ndefined&apos; {
       const devSession = document.cookie
-        .split('; ')
-        .find(row => row.startsWith('dev_session='));
+        .split(&apos; &apos;
+        .find(row => row.startsWith(&apos;ev_session=&apos;);
       
       if (devSession) {
         try {
-          const sessionData = JSON.parse(decodeURIComponent(devSession.split('=')[1]));
+          const sessionData = JSON.parse(decodeURIComponent(devSession.split(&apos;&apos;[1]));
           return sessionData.role;
         } catch (error) {
-          console.error('Error parsing dev session:', error);
+          console.error(&apos;rror parsing dev session:&apos; error);
         }
       }
     }
-    return 'CUSTOMER';
+    return &apos;USTOMER&apos;
   };
 
   const role = getRole();
 
   const getRoleDisplayName = (role: string): string => {
     switch (role) {
-      case 'SUPER_ADMIN': return '🔑 Super Admin';
-      case 'ADMIN': return '⚡ Admin';
-      case 'EMPLOYEE': return '👤 Employee';
-      case 'SALES_PERSON': return '💼 Salesperson';
-      case 'CUSTOMER': return '🛒 Customer';
-      default: return 'Unknown Role';
+      case &apos;UPER_ADMIN&apos; return &apos;� Super Admin&apos;
+      case &apos;DMIN&apos; return &apos; Admin&apos;
+      case &apos;MPLOYEE&apos; return &apos;� Employee&apos;
+      case &apos;ALES_PERSON&apos; return &apos;� Salesperson&apos;
+      case &apos;USTOMER&apos; return &apos;� Customer&apos;
+      default: return &apos;nknown Role&apos;
     }
   };
 
   const getRoleDescription = (role: string): string => {
     switch (role) {
-      case 'SUPER_ADMIN': return 'Full system access with impersonation capabilities';
-      case 'ADMIN': return 'Company management with impersonation capabilities';
-      case 'EMPLOYEE': return 'Limited management with impersonation capabilities';
-      case 'SALES_PERSON': return 'Sales dashboard and customer management';
-      case 'CUSTOMER': return 'Basic customer dashboard and referrals';
-      default: return 'Unknown role permissions';
+      case &apos;UPER_ADMIN&apos; return &apos;ull system access with impersonation capabilities&apos;
+      case &apos;DMIN&apos; return &apos;ompany management with impersonation capabilities&apos;
+      case &apos;MPLOYEE&apos; return &apos;imited management with impersonation capabilities&apos;
+      case &apos;ALES_PERSON&apos; return &apos;ales dashboard and customer management&apos;
+      case &apos;USTOMER&apos; return &apos;asic customer dashboard and referrals&apos;
+      default: return &apos;nknown role permissions&apos;
     }
   };
 
@@ -57,7 +57,7 @@ export function RoleBasedDashboard() {
     const baseStats = [
       {
         title: "Team ID",
-        value: teamId || 'N/A',
+        value: teamId || &apos;/A&apos;
         description: "Current team workspace",
         icon: Users,
         color: "text-blue-600"
@@ -71,7 +71,7 @@ export function RoleBasedDashboard() {
       }
     ];
 
-    if (role === 'SUPER_ADMIN') {
+    if (role === &apos;UPER_ADMIN&apos; {
       return [
         ...baseStats,
         {
@@ -98,7 +98,7 @@ export function RoleBasedDashboard() {
       ];
     }
 
-    if (role === 'ADMIN' || role === 'EMPLOYEE') {
+    if (role === &apos;DMIN&apos;|| role === &apos;MPLOYEE&apos; {
       return [
         ...baseStats,
         {
@@ -111,14 +111,14 @@ export function RoleBasedDashboard() {
         {
           title: "Team Sales",
           value: "$12,450",
-          description: "Your team's sales",
+          description: "Your team&apos; sales",
           icon: TrendingUp,
           color: "text-green-600"
         }
       ];
     }
 
-    if (role === 'SALES_PERSON') {
+    if (role === &apos;ALES_PERSON&apos; {
       return [
         ...baseStats,
         {
@@ -175,11 +175,11 @@ export function RoleBasedDashboard() {
       {/* Role-specific message */}
       <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
         <p className="text-blue-800 dark:text-blue-200">
-          {role === 'SUPER_ADMIN' && "You have full system access. Use the sidebar to manage users, view analytics, and impersonate other users for testing."}
-          {role === 'ADMIN' && "You can manage your company's users and view company-wide data. Check the sidebar for management options."}
-          {role === 'EMPLOYEE' && "You have access to assigned tasks and limited company data. Your permissions are managed by administrators."}
-          {role === 'SALES_PERSON' && "You can manage your customers, track your sales, and invite new customers. Use the sidebar to access your tools."}
-          {role === 'CUSTOMER' && "Welcome! You can view your purchases, refer friends, and manage your account from the sidebar."}
+          {role === &apos;UPER_ADMIN&apos;&& "You have full system access. Use the sidebar to manage users, view analytics, and impersonate other users for testing."}
+          {role === &apos;DMIN&apos;&& "You can manage your company&apos; users and view company-wide data. Check the sidebar for management options."}
+          {role === &apos;MPLOYEE&apos;&& "You have access to assigned tasks and limited company data. Your permissions are managed by administrators."}
+          {role === &apos;ALES_PERSON&apos;&& "You can manage your customers, track your sales, and invite new customers. Use the sidebar to access your tools."}
+          {role === &apos;USTOMER&apos;&& "Welcome! You can view your purchases, refer friends, and manage your account from the sidebar."}
         </p>
       </div>
 
@@ -207,7 +207,7 @@ export function RoleBasedDashboard() {
       </div>
 
       {/* Impersonation Note for Admins */}
-      {(role === 'SUPER_ADMIN' || role === 'ADMIN' || role === 'EMPLOYEE') && (
+      {(role === &apos;UPER_ADMIN&apos;|| role === &apos;DMIN&apos;|| role === &apos;MPLOYEE&apos; && (
         <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
           <h3 className="font-semibold text-yellow-800 dark:text-yellow-200 mb-2">
             🎭 Impersonation Feature
@@ -226,7 +226,7 @@ export function RoleBasedDashboard() {
           🛠️ Development Mode
         </h3>
         <p className="text-gray-600 dark:text-gray-400 text-sm">
-          You're currently logged in using the development login system. This allows you to test different user roles without setting up full authentication.
+          You&apos;re currently logged in using the development login system. This allows you to test different user roles without setting up full authentication.
         </p>
       </div>
     </div>

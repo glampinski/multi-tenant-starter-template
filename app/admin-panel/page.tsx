@@ -157,7 +157,7 @@ export default function SuperAdminPanel() {
     if (session?.user?.role === 'SUPER_ADMIN') {
       loadDashboardData();
     }
-  }, [session]);
+  }, [session, loadDashboardData]);
 
   const loadDashboardData = async () => {
     setDataLoading(true);
