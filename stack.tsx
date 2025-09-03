@@ -7,5 +7,7 @@ export const stackServerApp = new StackServerApp({
   urls: {
     afterSignIn: "/dashboard",
     afterSignUp: "/welcome", // New users go to welcome page first
+    signIn: "/handler/sign-in",
+    signUp: "/handler/sign-up",
   }
 });

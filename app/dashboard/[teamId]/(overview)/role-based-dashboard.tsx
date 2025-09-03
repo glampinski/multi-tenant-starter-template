@@ -1,8 +1,8 @@
 'use client';
 
-import { useRolePermissions } from '@/hooks/useRolePermissions';
-import { PERMISSIONS, ROLES, getRoleDisplayName } from '@/lib/permissions';
-import { useUser } from '@stackframe/stack';
+import { useRolePermissions, getRoleDisplayName } from '@/hooks/useRolePermissions';
+import { MODULES, ACTIONS, ROLES } from '@/types/permissions';
+import { UserImpersonationSelector } from '@/components/UserImpersonationSelector';
 import { useParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
@@ -71,13 +71,12 @@ const mockReferrals = [
 export function RoleBasedDashboard() {
   const params = useParams<{ teamId: string }>();
   const teamId = params?.teamId;
-  const user = useUser({ or: 'redirect' });
+  const { user, team } = useAppUser();
   const { getUserRole, hasPermission } = useRolePermissions();
   
-  if (!teamId) return <div>Loading...</div>;
+  if (!teamId || !user) return <div>Loading...</div>;
   
   const role = getUserRole(teamId);
-  const team = user.useTeam(teamId);
   
   if (!team || !role) return <div>Team not found</div>;
   
@@ -85,11 +84,14 @@ export function RoleBasedDashboard() {
   if (hasPermission(teamId, PERMISSIONS.VIEW_ALL_DATA)) {
     return (
       <div className="p-6 space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Company Overview</h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            Complete view of all platform activities as {getRoleDisplayName(role)}
-          </p>
+        <div className="flex justify-between items-start">
+          <div>
+            <h1 className="text-3xl font-bold">Company Overview</h1>
+            <p className="text-gray-600 dark:text-gray-400">
+              Complete view of all platform activities as {getRoleDisplayName(role)}
+            </p>
+          </div>
+          <UserImpersonationSelector teamId={teamId} />
         </div>
         
         {/* Mantine Analytics Dashboard */}
@@ -108,11 +110,14 @@ export function RoleBasedDashboard() {
   if (hasPermission(teamId, PERMISSIONS.MANAGE_COMPANY_USERS)) {
     return (
       <div className="p-6 space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Company Management</h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            Manage company operations and users as {getRoleDisplayName(role)}
-          </p>
+        <div className="flex justify-between items-start">
+          <div>
+            <h1 className="text-3xl font-bold">Company Management</h1>
+            <p className="text-gray-600 dark:text-gray-400">
+              Manage company operations and users as {getRoleDisplayName(role)}
+            </p>
+          </div>
+          <UserImpersonationSelector teamId={teamId} />
         </div>
         
         {/* Mantine Analytics Dashboard */}

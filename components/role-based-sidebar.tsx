@@ -1,8 +1,7 @@
 'use client';
 
-import { useRolePermissions } from '@/hooks/useRolePermissions';
-import { PERMISSIONS, getRoleDisplayName } from '@/lib/permissions';
-import { useUser, SelectedTeamSwitcher } from '@stackframe/stack';
+import { useRolePermissions, getRoleDisplayName } from '@/hooks/useRolePermissions';
+import { PERMISSIONS } from '@/lib/sidebar-permissions';
 import { 
   LayoutDashboard, 
   Users, 
@@ -14,7 +13,8 @@ import {
   Building,
   DollarSign,
   Share2,
-  FileText
+  FileText,
+  ShoppingCart
 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, usePathname } from 'next/navigation';
@@ -24,23 +24,27 @@ interface SidebarItem {
   title: string;
   href: string;
   icon: React.ComponentType<{ className?: string }>;
-  permission?: string;
+  permission?: { module: string; action: string };
 }
 
 interface RoleBasedSidebarProps {
   children: React.ReactNode;
+  user?: any;
+  team?: any;
 }
 
-export function RoleBasedSidebar({ children }: RoleBasedSidebarProps) {
-  const user = useUser({ or: 'redirect' });
+export function RoleBasedSidebar({ children, user: propUser, team: propTeam }: RoleBasedSidebarProps) {
   const params = useParams<{ teamId: string }>();
   const pathname = usePathname();
-  const { hasPermission, getUserRole } = useRolePermissions();
+  const { hasPermission, getUserRole } = useRolePermissions(propUser, propTeam);
+  
+  // Use props if provided
+  const user = propUser;
+  const team = propTeam;
   
   const teamId = params?.teamId;
-  const team = teamId ? user.useTeam(teamId) : null;
   
-  if (!team || !teamId) {
+  if (!team || !teamId || !user) {
     return <div className="flex items-center justify-center h-screen">Please select a team</div>;
   }
   
@@ -57,200 +61,140 @@ export function RoleBasedSidebar({ children }: RoleBasedSidebarProps) {
     ];
     
     // Super Admin sees everything
-    if (hasPermission(teamId, PERMISSIONS.VIEW_ALL_DATA)) {
+    if (role === 'SUPER_ADMIN') {
       return [
         ...baseItems,
         {
           title: "All Users",
           href: `/dashboard/${teamId}/users`,
-          icon: Users,
-          permission: PERMISSIONS.MANAGE_ALL_USERS
+          icon: Users
         },
         {
           title: "All Sales",
           href: `/dashboard/${teamId}/all-sales`,
-          icon: TrendingUp,
-          permission: PERMISSIONS.VIEW_ALL_DATA
+          icon: TrendingUp
         },
         {
           title: "All Customers",
           href: `/dashboard/${teamId}/all-customers`,
-          icon: UserCheck,
-          permission: PERMISSIONS.VIEW_ALL_DATA
+          icon: UserCheck
         },
         {
           title: "Company Analytics",
           href: `/dashboard/${teamId}/analytics`,
-          icon: Building,
-          permission: PERMISSIONS.VIEW_ALL_DATA
+          icon: Building
         },
         {
           title: "System Configuration",
           href: `/dashboard/${teamId}/configuration`,
-          icon: Settings,
-          permission: PERMISSIONS.CONFIGURE_SYSTEM
+          icon: Settings
         },
         {
           title: "Global Referrals",
           href: `/dashboard/${teamId}/referrals`,
-          icon: Share2,
-          permission: PERMISSIONS.VIEW_ALL_DATA
+          icon: Share2
         },
         {
           title: "Development Roadmap",
-          href: `/roadmap`,
-          icon: FileText,
-          permission: PERMISSIONS.VIEW_ALL_DATA
-        }
-      ];
-    }
-
-    // Admin navigation - company level access
-    if (hasPermission(teamId, PERMISSIONS.MANAGE_COMPANY_USERS)) {
-      return [
-        ...baseItems,
-        {
-          title: "Company Users",
-          href: `/dashboard/${teamId}/users`,
-          icon: Users,
-          permission: PERMISSIONS.MANAGE_COMPANY_USERS
-        },
-        {
-          title: "Company Sales",
-          href: `/dashboard/${teamId}/company-sales`,
-          icon: TrendingUp,
-          permission: PERMISSIONS.VIEW_COMPANY_DATA
-        },
-        {
-          title: "Company Customers",
-          href: `/dashboard/${teamId}/company-customers`,
-          icon: UserCheck,
-          permission: PERMISSIONS.VIEW_COMPANY_DATA
-        },
-        {
-          title: "Company Settings",
-          href: `/dashboard/${teamId}/company-settings`,
-          icon: Settings,
-          permission: PERMISSIONS.CONFIGURE_COMPANY
-        },
-        {
-          title: "Email Invitations",
-          href: `/dashboard/${teamId}/invite`,
-          icon: UserPlus,
-          permission: PERMISSIONS.MANAGE_COMPANY_USERS
-        },
-        {
-          title: "Company Referrals",
-          href: `/dashboard/${teamId}/referrals`,
-          icon: Share2,
-          permission: PERMISSIONS.VIEW_COMPANY_DATA
-        },
-        {
-          title: "Development Roadmap",
-          href: `/roadmap`,
-          icon: FileText,
-          permission: PERMISSIONS.MANAGE_COMPANY_USERS
-        }
-      ];
-    }
-
-    // Salesperson navigation
-    if (hasPermission(teamId, PERMISSIONS.VIEW_OWN_CUSTOMERS)) {
-      return [
-        ...baseItems,
-        {
-          title: "My Customers",
-          href: `/dashboard/${teamId}/my-customers`,
-          icon: UserCheck,
-          permission: PERMISSIONS.VIEW_OWN_CUSTOMERS
-        },
-        {
-          title: "My Sales",
-          href: `/dashboard/${teamId}/my-sales`,
-          icon: TrendingUp,
-          permission: PERMISSIONS.VIEW_OWN_SALES
-        },
-        {
-          title: "Sales Performance",
-          href: `/dashboard/${teamId}/sales-performance`,
-          icon: DollarSign,
-          permission: PERMISSIONS.VIEW_OWN_SALES
-        },
-        {
-          title: "Referral Links",
-          href: `/dashboard/${teamId}/referrals`,
-          icon: Share2,
-          permission: PERMISSIONS.INVITE_CUSTOMERS
-        },
-        {
-          title: "My Network",
-          href: `/dashboard/${teamId}/referrals`,
-          icon: Share2,
-          permission: PERMISSIONS.INVITE_CUSTOMERS
+          href: `/dashboard/${teamId}/roadmap`,
+          icon: FileText
         }
       ];
     }
     
-    // Employee navigation
-    if (hasPermission(teamId, PERMISSIONS.VIEW_ASSIGNED_DATA)) {
+    // Admin can manage company users  
+    if (role === 'ADMIN') {
+      return [
+        ...baseItems,
+        {
+          title: "Company Users",
+          href: `/dashboard/${teamId}/company-users`,
+          icon: Users
+        },
+        {
+          title: "Company Sales",
+          href: `/dashboard/${teamId}/company-sales`,
+          icon: TrendingUp
+        },
+        {
+          title: "Company Customers",
+          href: `/dashboard/${teamId}/company-customers`,
+          icon: UserCheck
+        },
+        {
+          title: "Company Settings",
+          href: `/dashboard/${teamId}/settings`,
+          icon: Settings
+        },
+        {
+          title: "Invite Users",
+          href: `/dashboard/${teamId}/invite`,
+          icon: UserPlus
+        },
+        {
+          title: "Company Analytics",
+          href: `/dashboard/${teamId}/analytics`,
+          icon: Building
+        },
+        {
+          title: "Team Referrals",
+          href: `/dashboard/${teamId}/referrals`,
+          icon: Share2
+        }
+      ];
+    }
+    
+    // Employee has limited management access
+    if (role === 'EMPLOYEE') {
       return [
         ...baseItems,
         {
           title: "Assigned Tasks",
           href: `/dashboard/${teamId}/tasks`,
-          icon: CheckSquare,
-          permission: PERMISSIONS.VIEW_ASSIGNED_DATA
+          icon: CheckSquare
         },
         {
-          title: "My Projects",
-          href: `/dashboard/${teamId}/projects`,
-          icon: Building,
-          permission: PERMISSIONS.VIEW_ASSIGNED_DATA
-        },
-        {
-          title: "My Network",
-          href: `/dashboard/${teamId}/referrals`,
-          icon: Share2,
-          permission: PERMISSIONS.VIEW_OWN_DASHBOARD
+          title: "My Data",
+          href: `/dashboard/${teamId}/my-data`,
+          icon: FileText
         }
       ];
     }
     
-    // Customer navigation (minimal)
+    // Customer has basic access
     return [
       ...baseItems,
       {
         title: "My Account",
         href: `/dashboard/${teamId}/account`,
-        icon: UserCheck,
-        permission: PERMISSIONS.VIEW_OWN_DASHBOARD
+        icon: Users
       },
       {
-        title: "Share & Earn",
-        href: `/dashboard/${teamId}/referrals`,
-        icon: Share2,
-        permission: PERMISSIONS.INVITE_OTHER_CUSTOMERS
+        title: "My Purchases",
+        href: `/dashboard/${teamId}/purchases`,
+        icon: ShoppingCart
       },
       {
-        title: "My Network",
+        title: "My Referrals",
         href: `/dashboard/${teamId}/referrals`,
-        icon: Share2,
-        permission: PERMISSIONS.VIEW_OWN_DASHBOARD
+        icon: Share2
+      },
+      {
+        title: "Invite Friends",
+        href: `/dashboard/${teamId}/invite`,
+        icon: UserPlus
       }
     ];
-  };
-  
-  const navigationItems = getNavigationItems();
+  };  const navigationItems = getNavigationItems();
   
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
       {/* Sidebar */}
       <div className="w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700">
         <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-          <SelectedTeamSwitcher 
-            selectedTeam={team}
-            urlMap={(team) => `/dashboard/${team.id}`}
-          />
+          <div className="text-lg font-semibold text-gray-900 dark:text-white">
+            {team.displayName}
+          </div>
           <div className="mt-2">
             <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
               {roleDisplayName}

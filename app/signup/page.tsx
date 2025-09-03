@@ -26,7 +26,7 @@ export default function CustomSignupPage() {
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
-    email: '',
+    email: searchParams.get('email') || '', // Pre-fill from invitation
     password: '',
     confirmPassword: ''
   });

@@ -10,13 +10,31 @@ export default async function IndexPage() {
   if (!project.config.clientTeamCreationEnabled) {
     return (
       <div className="w-full min-h-96 flex items-center justify-center">
-        <div className="max-w-xl gap-4">
-          <p className="font-bold text-xl">Setup Required</p>
-          <p className="">
-            {
-              "To start using this project, please enable client-side team creation in the Stack Auth dashboard (Project > Team Settings). This message will disappear once the feature is enabled."
-            }
-          </p>
+        <div className="max-w-xl gap-4 text-center space-y-6">
+          <div>
+            <p className="font-bold text-xl">Setup Required</p>
+            <p className="">
+              {
+                "To start using this project, please enable client-side team creation in the Stack Auth dashboard (Project > Team Settings)."
+              }
+            </p>
+          </div>
+          
+          <div className="border-t pt-6">
+            <p className="font-semibold text-lg mb-2">Development Testing</p>
+            <p className="text-sm text-muted-foreground mb-4">
+              Want to test the impersonation system right away?
+            </p>
+            <a 
+              href="/dev-login" 
+              className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2"
+            >
+              🔧 Development Login
+            </a>
+            <p className="text-xs text-muted-foreground mt-2">
+              Access with pre-configured test accounts
+            </p>
+          </div>
         </div>
       </div>
     );

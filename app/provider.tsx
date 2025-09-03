@@ -1,12 +1,14 @@
 'use client';
 
 import { ThemeProvider } from "next-themes";
-
+import { ImpersonationProvider } from "@/hooks/useImpersonation";
 
 export function Provider(props: { children?: React.ReactNode }) {
   return (
     <ThemeProvider attribute="class">
-      {props.children}
+      <ImpersonationProvider>
+        {props.children}
+      </ImpersonationProvider>
     </ThemeProvider>
   );
 }

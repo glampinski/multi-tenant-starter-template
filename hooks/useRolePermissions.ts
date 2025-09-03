@@ -1,19 +1,55 @@
 'use client';
 
-import { useUser } from '@stackframe/stack';
-import { ROLE_PERMISSIONS, ROLES, type Role, type Permission } from '@/lib/permissions';
+import { MODULES, ACTIONS, ROLES, DEFAULT_ROLE_PERMISSIONS, type ModuleType, type ActionType, type RoleType } from '@/types/permissions';
 
-export function useRolePermissions() {
-  const user = useUser(); // Remove 'redirect' to prevent conditional behavior
+export function getRoleDisplayName(role: string): string {
+  switch (role) {
+    case 'super_admin':
+    case 'SUPER_ADMIN':
+      return '🔑 Super Admin';
+    case 'admin':
+    case 'ADMIN':
+      return '⚡ Admin';
+    case 'employee':
+    case 'EMPLOYEE':
+      return '👤 Employee';
+    case 'sales_person':
+    case 'SALES_PERSON':
+      return '💼 Salesperson';
+    case 'customer':
+    case 'CUSTOMER':
+      return '🛒 Customer';
+    default:
+      return 'Unknown Role';
+  }
+}
+
+export function useRolePermissions(propUser?: any, propTeam?: any) {
+  let user = propUser;
+  let team = propTeam;
   
-  const getUserRole = (teamId: string): Role | null => {
-    if (!user) return null;
+  // If no props provided, try to get from context (may not always work)
+  if (!user || !team) {
+    try {
+      const { useAppUser } = require('@/hooks/useAppUser');
+      const hookResult = useAppUser();
+      user = user || hookResult.user;
+      team = team || hookResult.team;
+    } catch (error) {
+      // Hook not available in this context
+    }
+  }
+  
+  const getUserRole = (teamId: string): RoleType | null => {
+    if (!user || !team || team.id !== teamId) return null;
     
-    const team = user.useTeam(teamId);
-    if (!team) return null;
+    // For development session or if user has role property, use it directly
+    if (user.role) {
+      return user.role as RoleType;
+    }
     
+    // For Stack Auth users, check team metadata or use defaults
     // For demo purposes, we'll use team name prefixes to determine roles
-    // In production, you'd store this in your database or team metadata
     const teamName = team.displayName.toLowerCase();
     
     // Check team name prefixes for role determination
@@ -41,12 +77,12 @@ export function useRolePermissions() {
     return ROLES.CUSTOMER;
   };
   
-  const hasPermission = (teamId: string, permission: Permission): boolean => {
+  const hasPermission = (teamId: string, module: ModuleType, action: ActionType): boolean => {
     const role = getUserRole(teamId);
     if (!role) return false;
     
-    const permissions = ROLE_PERMISSIONS[role] as readonly Permission[];
-    return permissions?.includes(permission) || false;
+    const rolePermissions = DEFAULT_ROLE_PERMISSIONS[role];
+    return rolePermissions.some(p => p.module === module && p.action === action);
   };
   
   const canViewData = (teamId: string, dataOwnerId?: string): boolean => {
@@ -78,7 +114,7 @@ export function useRolePermissions() {
            role === ROLES.CUSTOMER;
   };
   
-  const getInviteRoleOptions = (teamId: string): Role[] => {
+  const getInviteRoleOptions = (teamId: string): RoleType[] => {
     const role = getUserRole(teamId);
     
     switch (role) {

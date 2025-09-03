@@ -6,30 +6,16 @@ import { useUser } from "@stackframe/stack";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-interface DevUser {
-  id: string;
-  email: string;
-  displayName: string;
-  role: string;
-  teamId: string;
-  isDev: true;
-}
-
-interface DevTeam {
-  id: string;
-  displayName: string;
-}
-
-export default function Layout(props: { children: React.ReactNode }) {
-  const params = useParams<{ teamId: string }>();
-  const router = useRouter();
-  const [devUser, setDevUser] = useState<DevUser | null>(null);
-  const [devTeam, setDevTeam] = useState<DevTeam | null>(null);
+// Custom hook for development authentication
+function useDevAuth() {
+  const [devUser, setDevUser] = useState<any>(null);
+  const [devTeam, setDevTeam] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const params = useParams<{ teamId: string }>();
 
-  // Check for development session first
   useEffect(() => {
     if (process.env.NODE_ENV === 'development') {
+      // Check for development session
       const devSession = document.cookie
         .split('; ')
         .find(row => row.startsWith('dev_session='));
@@ -39,24 +25,37 @@ export default function Layout(props: { children: React.ReactNode }) {
           const sessionData = JSON.parse(decodeURIComponent(devSession.split('=')[1]));
           
           if (sessionData.isDev && sessionData.exp > Date.now()) {
-            const mockUser: DevUser = {
+            // Create mock user and team objects
+            const mockUser = {
               id: sessionData.userId,
               email: sessionData.email,
               displayName: `${sessionData.firstName} ${sessionData.lastName}`,
+              primaryEmail: sessionData.email,
+              primaryEmailVerified: true,
+              selectedTeamId: sessionData.teamId,
+              signedUpAtMillis: Date.now() - (30 * 24 * 60 * 60 * 1000),
+              clientReadOnlyMetadata: {},
+              clientMetadata: {},
+              serverMetadata: { role: sessionData.role },
+              hasPassword: true,
+              oauthProviders: [],
+              connectedAccounts: [],
               role: sessionData.role,
               teamId: sessionData.teamId,
               isDev: true
             };
 
-            const mockTeam: DevTeam = {
-              id: sessionData.teamId,
-              displayName: 'Test Company'
+            const mockTeam = {
+              id: params.teamId,
+              displayName: 'Test Company',
+              profileImageUrl: null,
+              createdAtMillis: Date.now() - (30 * 24 * 60 * 60 * 1000),
+              clientMetadata: {},
+              serverMetadata: {},
             };
 
             setDevUser(mockUser);
             setDevTeam(mockTeam);
-            setLoading(false);
-            return;
           }
         } catch (error) {
           console.error('Error parsing dev session:', error);
@@ -64,29 +63,36 @@ export default function Layout(props: { children: React.ReactNode }) {
       }
     }
     setLoading(false);
-  }, []);
+  }, [params.teamId]);
 
-  // Only use Stack Auth if no dev session
-  const stackUser = devUser ? null : useUser({ or: 'redirect' });
-  const stackTeam = stackUser?.useTeam(params?.teamId);
+  return { devUser, devTeam, loading };
+}
+
+export default function Layout(props: { children: React.ReactNode }) {
+  const params = useParams<{ teamId: string }>();
+  const router = useRouter();
+  const { devUser, devTeam, loading: devLoading } = useDevAuth();
+
+  // Use Stack Auth only if not in dev mode or no dev session
+  const stackUser = useUser({ 
+    or: devUser ? undefined : 'redirect' 
+  });
+  
+  const stackTeam = stackUser?.useTeam(params.teamId);
 
   // Determine which user/team to use
   const user = devUser || stackUser;
   const team = devTeam || stackTeam;
 
   useEffect(() => {
-    if (!loading && !user) {
-      if (process.env.NODE_ENV === 'development') {
-        router.push('/dev-login');
-      } else {
-        // Let Stack Auth handle redirection
-      }
-    } else if (!loading && user && !team) {
+    if (!devLoading && !user) {
+      router.push('/dev-login');
+    } else if (!devLoading && user && !team) {
       router.push('/dashboard');
     }
-  }, [user, team, router, loading]);
+  }, [user, team, router, devLoading]);
 
-  if (loading || !user) {
+  if (devLoading || !user) {
     return (
       <div className="flex items-center justify-center h-screen w-screen">
         <div className="text-center">
@@ -111,7 +117,7 @@ export default function Layout(props: { children: React.ReactNode }) {
   return (
     <>
       <ImpersonationBanner />
-      <RoleBasedSidebar user={user} team={team}>
+      <RoleBasedSidebar>
         {props.children}
       </RoleBasedSidebar>
     </>

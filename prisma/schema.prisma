@@ -223,3 +223,60 @@ model TeamSettings {
   
   @@map("team_settings")
 }
+
+// Permission system for granular access control
+model Permission {
+  id          String @id @default(cuid())
+  name        String
+  description String
+  module      String // CUSTOMERS, SALES, REFERRALS, ANALYTICS, etc.
+  action      String // VIEW, CREATE, EDIT, DELETE, ASSIGN, EXPORT, IMPERSONATE
+  
+  // Timestamps
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  rolePermissions RolePermission[]
+  userPermissions UserPermission[]
+
+  @@unique([module, action])
+  @@map("permissions")
+}
+
+// Role-based permissions (default permissions for each role)
+model RolePermission {
+  id           String   @id @default(cuid())
+  role         UserRole
+  permissionId String
+  teamId       String   // Stack Auth team ID
+  
+  // Relations
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  
+  // Timestamps
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([role, permissionId, teamId])
+  @@map("role_permissions")
+}
+
+// User-specific permission overrides
+model UserPermission {
+  id           String      @id @default(cuid())
+  userId       String      // Stack Auth user ID
+  permissionId String
+  teamId       String      // Stack Auth team ID
+  granted      Boolean     @default(true) // false = explicitly denied (override role permission)
+  
+  // Relations
+  permission   Permission  @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  
+  // Timestamps
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@unique([userId, permissionId, teamId])
+  @@map("user_permissions")
+}
