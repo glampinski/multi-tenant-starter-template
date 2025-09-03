@@ -122,7 +122,7 @@ export default function SignUpPage() {
             </Button>
 
             <div className="text-sm text-center text-gray-600">
-              <p>We&apos;ll send you a secure link to complete your registration.</p>
+              <p>We'll send you a secure link to complete your registration.</p>
               {ref && type === 'referral' && (
                 <p className="mt-2 font-medium">Referred by: <span className="text-blue-600">{ref}</span></p>
               )}

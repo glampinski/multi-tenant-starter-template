@@ -545,7 +545,7 @@ export default function CompanyUsersPage() {
             value={formData.email}
             onChange={(e) => setFormData({ ...formData, email: e.target.value })}
             required
-            disabled // Don&apos;t allow editing email for existing users
+            disabled // Don't allow editing email for existing users
           />
           
           <TextInput

@@ -95,7 +95,7 @@ export default function JoinPage() {
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-bold">Join Our Team</CardTitle>
           <CardDescription>
-            You&apos;ve been invited to join {inviteData?.teamName || 'our team'} as a {inviteData?.role || 'team member'}.
+            You've been invited to join {inviteData?.teamName || 'our team'} as a {inviteData?.role || 'team member'}.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -124,7 +124,7 @@ export default function JoinPage() {
             </Button>
 
             <div className="text-sm text-center text-gray-600">
-              <p>We&apos;ll send you a magic link to complete your registration.</p>
+              <p>We'll send you a magic link to complete your registration.</p>
             </div>
           </form>
         </CardContent>

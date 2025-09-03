@@ -460,7 +460,7 @@ export default function UsersPage() {
             value={formData.email}
             onChange={(e) => setFormData({ ...formData, email: e.target.value })}
             required
-            disabled={!!editingUser} // Don&apos;t allow editing email for existing users
+            disabled={!!editingUser} // Don't allow editing email for existing users
           />
           
           <Select
