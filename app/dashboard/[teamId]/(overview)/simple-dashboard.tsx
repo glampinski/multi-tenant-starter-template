@@ -98,7 +98,7 @@ export function RoleBasedDashboard() {
       ];
     }
 
-    if (role === 'DMIN'|| role === 'MPLOYEE' {
+    if (role === 'ADMIN' || role === 'EMPLOYEE') {
       return [
         ...baseStats,
         {
@@ -118,7 +118,7 @@ export function RoleBasedDashboard() {
       ];
     }
 
-    if (role === 'ALES_PERSON' {
+    if (role === 'SALES_PERSON') {
       return [
         ...baseStats,
         {
@@ -175,11 +175,11 @@ export function RoleBasedDashboard() {
       {/* Role-specific message */}
       <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
         <p className="text-blue-800 dark:text-blue-200">
-          {role === 'UPER_ADMIN'&& "You have full system access. Use the sidebar to manage users, view analytics, and impersonate other users for testing."}
-          {role === 'DMIN'&& "You can manage your company' users and view company-wide data. Check the sidebar for management options."}
-          {role === 'MPLOYEE'&& "You have access to assigned tasks and limited company data. Your permissions are managed by administrators."}
-          {role === 'ALES_PERSON'&& "You can manage your customers, track your sales, and invite new customers. Use the sidebar to access your tools."}
-          {role === 'USTOMER'&& "Welcome! You can view your purchases, refer friends, and manage your account from the sidebar."}
+          {role === 'SUPER_ADMIN' && "You have full system access. Use the sidebar to manage users, view analytics, and impersonate other users for testing."}
+          {role === 'ADMIN' && "You can manage your company's users and view company-wide data. Check the sidebar for management options."}
+          {role === 'EMPLOYEE' && "You have access to assigned tasks and limited company data. Your permissions are managed by administrators."}
+          {role === 'SALES_PERSON' && "You can manage your customers, track your sales, and invite new customers. Use the sidebar to access your tools."}
+          {role === 'CUSTOMER' && "Welcome! You can view your purchases, refer friends, and manage your account from the sidebar."}
         </p>
       </div>
 
@@ -207,7 +207,7 @@ export function RoleBasedDashboard() {
       </div>
 
       {/* Impersonation Note for Admins */}
-      {(role === 'UPER_ADMIN'|| role === 'DMIN'|| role === 'MPLOYEE' && (
+      {(role === 'SUPER_ADMIN' || role === 'ADMIN' || role === 'EMPLOYEE') && (
         <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
           <h3 className="font-semibold text-yellow-800 dark:text-yellow-200 mb-2">
             🎭 Impersonation Feature
@@ -226,7 +226,7 @@ export function RoleBasedDashboard() {
           🛠️ Development Mode
         </h3>
         <p className="text-gray-600 dark:text-gray-400 text-sm">
-          You're currently logged in using the development login system. This allows you to test different user roles without setting up full authentication.
+          You&apos;re currently logged in using the development login system. This allows you to test different user roles without setting up full authentication.
         </p>
       </div>
     </div>

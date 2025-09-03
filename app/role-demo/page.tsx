@@ -20,15 +20,15 @@ interface User {
   id: string;
   name: string;
   email: string;
-  role: 'super_admin' | 'admin' | 'employee' | 'sales_person' | 'customer';
+  role: 'SUPER_ADMIN' | 'ADMIN' | 'EMPLOYEE' | 'SALES_PERSON' | 'CUSTOMER';
 }
 
 const mockUsers: User[] = [
-  { id: '1', name: 'Super Admin User', email: 'superadmin@example.com', role: 'super_admin' },
-  { id: '2', name: 'Admin User', email: 'admin@example.com', role: 'admin' },
-  { id: '3', name: 'Employee User', email: 'employee@example.com', role: 'employee' },
-  { id: '4', name: 'Sales Person', email: 'sales@example.com', role: 'sales_person' },
-  { id: '5', name: 'Customer User', email: 'customer@example.com', role: 'customer' },
+  { id: '1', name: 'Super Admin User', email: 'superadmin@example.com', role: 'SUPER_ADMIN' },
+  { id: '2', name: 'Admin User', email: 'admin@example.com', role: 'ADMIN' },
+  { id: '3', name: 'Employee User', email: 'employee@example.com', role: 'EMPLOYEE' },
+  { id: '4', name: 'Sales Person', email: 'sales@example.com', role: 'SALES_PERSON' },
+  { id: '5', name: 'Customer User', email: 'customer@example.com', role: 'CUSTOMER' },
 ];
 
 interface FeatureItem {
@@ -42,73 +42,73 @@ const allFeatures: FeatureItem[] = [
   {
     title: 'System Configuration',
     icon: Settings,
-    permission: PERMISSIONS.CONFIGURE_SYSTEM,
+    permission: `${PERMISSIONS.MODULES.SETTINGS}.${PERMISSIONS.ACTIONS.MANAGE}`,
     description: 'Configure system-wide settings and parameters'
   },
   {
-    title: 'All User Management',
+    title: 'Team Management',
     icon: Shield,
-    permission: PERMISSIONS.MANAGE_ALL_USERS,
-    description: 'Manage all users across the entire system'
+    permission: `${PERMISSIONS.MODULES.TEAM_MANAGEMENT}.${PERMISSIONS.ACTIONS.MANAGE}`,
+    description: 'Manage users within the team'
   },
   {
-    title: 'Global Data Access',
+    title: 'Analytics Access',
     icon: Database,
-    permission: PERMISSIONS.VIEW_ALL_DATA,
-    description: 'View all data across the entire system'
-  },
-  {
-    title: 'Company Users',
-    icon: Users,
-    permission: PERMISSIONS.MANAGE_COMPANY_USERS,
-    description: 'Manage users within your company'
-  },
-  {
-    title: 'Company Data',
-    icon: Building,
-    permission: PERMISSIONS.VIEW_COMPANY_DATA,
-    description: 'View data within your company'
-  },
-  {
-    title: 'Company Settings',
-    icon: Settings,
-    permission: PERMISSIONS.CONFIGURE_COMPANY,
-    description: 'Configure company-specific settings'
-  },
-  {
-    title: 'Assigned Tasks',
-    icon: CheckSquare,
-    permission: PERMISSIONS.VIEW_ASSIGNED_DATA,
-    description: 'View data and tasks assigned to you'
+    permission: `${PERMISSIONS.MODULES.ANALYTICS}.${PERMISSIONS.ACTIONS.VIEW}`,
+    description: 'View analytics and reporting data'
   },
   {
     title: 'Customer Management',
-    icon: UserCheck,
-    permission: PERMISSIONS.VIEW_OWN_CUSTOMERS,
-    description: 'Manage your assigned customers'
+    icon: Users,
+    permission: `${PERMISSIONS.MODULES.CUSTOMERS}.${PERMISSIONS.ACTIONS.MANAGE}`,
+    description: 'Manage customer accounts and data'
   },
   {
     title: 'Sales Data',
-    icon: DollarSign,
-    permission: PERMISSIONS.VIEW_OWN_SALES,
-    description: 'View your sales performance and data'
+    icon: Building,
+    permission: `${PERMISSIONS.MODULES.SALES}.${PERMISSIONS.ACTIONS.VIEW}`,
+    description: 'View sales data and performance'
   },
   {
-    title: 'Invite Customers',
+    title: 'Billing Access',
+    icon: Settings,
+    permission: `${PERMISSIONS.MODULES.BILLING}.${PERMISSIONS.ACTIONS.VIEW}`,
+    description: 'Access billing and payment information'
+  },
+  {
+    title: 'Dashboard Access',
+    icon: CheckSquare,
+    permission: `${PERMISSIONS.MODULES.DASHBOARD}.${PERMISSIONS.ACTIONS.VIEW}`,
+    description: 'Access the main dashboard'
+  },
+  {
+    title: 'Customer Creation',
+    icon: UserCheck,
+    permission: `${PERMISSIONS.MODULES.CUSTOMERS}.${PERMISSIONS.ACTIONS.CREATE}`,
+    description: 'Create new customer accounts'
+  },
+  {
+    title: 'Sales Creation',
+    icon: DollarSign,
+    permission: `${PERMISSIONS.MODULES.SALES}.${PERMISSIONS.ACTIONS.CREATE}`,
+    description: 'Create and manage sales records'
+  },
+  {
+    title: 'Referral Management',
     icon: UserPlus,
-    permission: PERMISSIONS.INVITE_CUSTOMERS,
-    description: 'Invite new customers to the platform'
+    permission: `${PERMISSIONS.MODULES.REFERRALS}.${PERMISSIONS.ACTIONS.VIEW}`,
+    description: 'Manage referral programs and tracking'
   },
   {
     title: 'Personal Dashboard',
     icon: LayoutDashboard,
-    permission: PERMISSIONS.VIEW_OWN_DASHBOARD,
+    permission: `${PERMISSIONS.MODULES.DASHBOARD}.${PERMISSIONS.ACTIONS.VIEW}`,
     description: 'Access your personal dashboard'
   },
   {
     title: 'Customer Referrals',
     icon: TrendingUp,
-    permission: PERMISSIONS.INVITE_OTHER_CUSTOMERS,
+    permission: `${PERMISSIONS.MODULES.REFERRALS}.${PERMISSIONS.ACTIONS.CREATE}`,
     description: 'Invite and refer other customers'
   },
 ];
@@ -217,7 +217,7 @@ export default function RoleDemoPage() {
               <div className="bg-white rounded-lg shadow p-6">
                 <h3 className="text-lg font-medium text-gray-900 mb-2">Role Level</h3>
                 <p className="text-3xl font-bold text-green-600">
-                  {Object.values(ROLES).indexOf(currentUser.role) + 1}
+                  {Object.values(ROLES).indexOf(currentUser.role as any) + 1}
                 </p>
                 <p className="text-sm text-gray-500">Access level (1-5)</p>
               </div>

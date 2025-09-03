@@ -1,11 +1,11 @@
 import { redirect } from 'next/navigation';
 import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { authOptions } from '@/lib/auth';
 import { ROLES } from '@/types/permissions';
 
 interface Props {
-  params: { username: string };
-  searchParams: { role?: string };
+  params: Promise<{ username: string }>;
+  searchParams: Promise<{ role?: string }>;
 }
 
 export default async function UsernameReferralPage({ params, searchParams }: Props) {

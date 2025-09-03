@@ -10,10 +10,9 @@ async function seedData() {
     // Create sample user profiles
     const userProfiles = await Promise.all([
       prisma.userProfile.upsert({
-        where: { stackUserId: 'user_1_test' },
+        where: { email: 'admin@example.com' },
         update: {},
         create: {
-          stackUserId: 'user_1_test',
           role: 'ADMIN',
           teamId: 'team_1',
           username: 'admin_user',
@@ -24,10 +23,9 @@ async function seedData() {
         }
       }),
       prisma.userProfile.upsert({
-        where: { stackUserId: 'user_2_test' },
+        where: { email: 'sales@example.com' },
         update: {},
         create: {
-          stackUserId: 'user_2_test',
           role: 'SALES_PERSON',
           teamId: 'team_1',
           username: 'sales_person_1',
@@ -38,10 +36,9 @@ async function seedData() {
         }
       }),
       prisma.userProfile.upsert({
-        where: { stackUserId: 'user_3_test' },
+        where: { email: 'customer@example.com' },
         update: {},
         create: {
-          stackUserId: 'user_3_test',
           role: 'CUSTOMER',
           teamId: 'team_1',
           username: 'customer_1',

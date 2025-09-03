@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth/next'
-import { authOptions } from '@/app/api/auth/[...nextauth]/route'
+import { authOptions } from '@/lib/auth'
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { userId: string } }
+  { params }: { params: Promise<{ userId: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -13,7 +13,7 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { userId } = params
+    const { userId } = await params
     const { searchParams } = new URL(req.url)
     const timeframe = searchParams.get('timeframe') || '30d'
 
@@ -286,9 +286,10 @@ async function getRevenueAnalysis(userId: string, dateRange: { start: Date; end:
     `
   ])
 
+  // Calculate growth percentage
   const currentRevenue = currentPeriod._sum.actualValue || 0
   const previousRevenue = previousPeriod._sum.actualValue || 0
-  const growth = previousRevenue > 0 ? ((Number(currentRevenue) - Number(previousRevenue)) / Number(previousRevenue)) * 100 : 0
+  const growth = Number(previousRevenue) > 0 ? ((Number(currentRevenue) - Number(previousRevenue)) / Number(previousRevenue)) * 100 : 0
 
   return {
     currentRevenue,

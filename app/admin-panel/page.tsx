@@ -94,7 +94,7 @@ import {
   IconPercentage,
   IconGift,
 } from '@tabler/icons-react';
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 
 // Real database-connected component
 export default function SuperAdminPanel() {
@@ -152,14 +152,7 @@ export default function SuperAdminPanel() {
     }
   }, [status]);
 
-  // Load real data from database
-  useEffect(() => {
-    if (session?.user?.role === 'SUPER_ADMIN') {
-      loadDashboardData();
-    }
-  }, [session, loadDashboardData]);
-
-  const loadDashboardData = async () => {
+  const loadDashboardData = useCallback(async () => {
     setDataLoading(true);
     try {
       let customersData: any[] = [];
@@ -213,7 +206,14 @@ export default function SuperAdminPanel() {
     } finally {
       setDataLoading(false);
     }
-  };
+  }, []);
+
+  // Load real data from database
+  useEffect(() => {
+    if (session?.user?.role === 'SUPER_ADMIN') {
+      loadDashboardData();
+    }
+  }, [session, loadDashboardData]);
 
   const calculateSystemStats = (customers: any[], users: any[], referrals: any[]) => {
     const totalCustomers = customers.length;

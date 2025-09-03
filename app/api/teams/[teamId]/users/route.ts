@@ -4,12 +4,12 @@ import { UserRole } from '@prisma/client';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { teamId: string } }
+  { params }: { params: Promise<{ teamId: string }> }
 ) {
   try {
     const { searchParams } = new URL(request.url);
     const canImpersonateParam = searchParams.get('canImpersonate');
-    const { teamId } = params;
+    const { teamId } = await params;
 
     if (!teamId) {
       return NextResponse.json({ error: 'Team ID is required' }, { status: 400 });

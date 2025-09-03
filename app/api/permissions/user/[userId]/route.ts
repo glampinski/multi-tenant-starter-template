@@ -4,12 +4,12 @@ import { MODULES, ACTIONS } from '@/types/permissions';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { userId: string } }
+  { params }: { params: Promise<{ userId: string }> }
 ) {
   try {
     const { searchParams } = new URL(request.url);
     const teamId = searchParams.get('teamId');
-    const { userId } = params;
+    const { userId } = await params;
 
     if (!teamId) {
       return NextResponse.json({ error: 'Team ID is required' }, { status: 400 });
