@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { TenantStatus } from '@prisma/client'
+import { headers } from 'next/headers'
 
 export interface TenantContext {
   id: string
@@ -21,7 +22,49 @@ export interface EnhancedRequest extends NextRequest {
 }
 
 /**
+ * Get tenant context from middleware headers (for use in pages and API routes)
+ */
+export async function getTenantFromHeaders(): Promise<TenantContext | null> {
+  try {
+    const headersList = await headers()
+    const tenantSlug = headersList.get('x-tenant-slug')
+    const tenantType = headersList.get('x-tenant-type')
+    
+    if (!tenantSlug) {
+      return null
+    }
+    
+    // Look up tenant in database based on the type
+    const whereClause = tenantType === 'domain' 
+      ? { domain: tenantSlug }
+      : { slug: tenantSlug }
+    
+    const tenant = await prisma.tenant.findUnique({
+      where: whereClause,
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        domain: true,
+        status: true,
+        plan: true,
+        settings: true,
+        primaryColor: true,
+        secondaryColor: true,
+        logoUrl: true
+      }
+    })
+    
+    return tenant as TenantContext | null
+  } catch (error) {
+    console.error('Error getting tenant from headers:', error)
+    return null
+  }
+}
+
+/**
  * Enhanced middleware for tenant identification and context injection
+ * Note: This is now used in API routes and pages, not middleware
  */
 export async function withTenantContext(
   request: NextRequest,

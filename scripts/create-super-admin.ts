@@ -28,8 +28,34 @@ async function createSuperAdmin() {
     if (existingProfile) {
       console.log(`✅ Super Admin already exists: ${email}`);
       console.log(`👤 Profile ID: ${existingProfile.id}`);
+      console.log(`🏢 Tenant: ${existingProfile.tenantId}`);
       console.log(`🏢 Team: ${existingProfile.teamId}`);
       return;
+    }
+
+    console.log('🏢 Setting up default tenant...');
+
+    // Check if default tenant exists, create if not
+    let defaultTenant = await prisma.tenant.findFirst({
+      where: { slug: 'default' }
+    });
+
+    if (!defaultTenant) {
+      console.log('🏗️ Creating default tenant...');
+      defaultTenant = await prisma.tenant.create({
+        data: {
+          name: 'Default Organization',
+          slug: 'default',
+          description: 'Default tenant for super admin',
+          status: 'ACTIVE',
+          plan: 'ENTERPRISE',
+          maxUsers: 1000,
+          maxApiCalls: 100000,
+        }
+      });
+      console.log(`✅ Default tenant created: ${defaultTenant.id}`);
+    } else {
+      console.log(`✅ Using existing tenant: ${defaultTenant.id}`);
     }
 
     console.log('👤 Creating Super Admin profile...');
@@ -45,8 +71,10 @@ async function createSuperAdmin() {
         firstName: name.split(' ')[0] || 'Super',
         lastName: name.split(' ').slice(1).join(' ') || 'Admin',
         email: email,
+        tenantId: defaultTenant.id, // Multi-tenant requirement
         teamId: 'main_team', // Default team
         referralCode: `SUPER_${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
+        inviteVerified: true, // Super admin is pre-verified
       }
     });
 
@@ -54,10 +82,12 @@ async function createSuperAdmin() {
     console.log(`📧 Email: ${email}`);
     console.log(`👤 Name: ${name}`);
     console.log(`🆔 Profile ID: ${superAdminProfile.id}`);
+    console.log(`🏢 Tenant: ${superAdminProfile.tenantId} (${defaultTenant.name})`);
     console.log(`🏢 Team: ${superAdminProfile.teamId}`);
     console.log(`🎫 Referral Code: ${superAdminProfile.referralCode}`);
-    console.log(`\n⚠️  Note: You'll need to configure NextAuth email provider to send magic links`);
-    console.log(`🔗 Try signing in at: http://localhost:3000/auth/signin`);
+    console.log(`\n🚀 Super Admin setup complete!`);
+    console.log(`🔗 You can now sign in at: http://localhost:3000/auth/signin`);
+    console.log(`📧 Use the magic link that will be sent to: ${email}`);
 
   } catch (error) {
     console.error('❌ Error creating Super Admin:', error);

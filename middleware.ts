@@ -1,40 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
 
 export async function middleware(request: NextRequest) {
   // Always check for tenant context first
-  const tenantContext = await extractTenantContext(request);
+  const tenantContext = extractTenantContext(request);
   
   // Create response object
   let response = NextResponse.next();
   
   // Add tenant context headers if found
   if (tenantContext) {
-    response.headers.set('x-tenant-id', tenantContext.id);
     response.headers.set('x-tenant-slug', tenantContext.slug);
-    response.headers.set('x-tenant-status', tenantContext.status);
+    response.headers.set('x-tenant-type', tenantContext.type);
     
-    // Check tenant status
-    if (tenantContext.status === 'SUSPENDED' || tenantContext.status === 'EXPIRED') {
-      // For API routes, return JSON error
-      if (request.nextUrl.pathname.startsWith('/api/')) {
-        return new NextResponse(
-          JSON.stringify({ 
-            error: `Tenant ${tenantContext.status.toLowerCase()}`,
-            message: tenantContext.status === 'SUSPENDED' 
-              ? 'This organization account has been suspended. Please contact support.'
-              : 'This organization account has expired. Please renew your subscription.'
-          }),
-          { 
-            status: 403,
-            headers: { 'Content-Type': 'application/json' }
-          }
-        );
-      }
-      
-      // For web routes, redirect to status page
-      return NextResponse.redirect(new URL(`/tenant-${tenantContext.status.toLowerCase()}`, request.url));
-    }
+    // Note: We can't validate tenant status in middleware (Edge Runtime)
+    // Tenant status validation will be handled in API routes and pages
   }
   
   // Only run development bypass in development
@@ -46,64 +25,40 @@ export async function middleware(request: NextRequest) {
 }
 
 /**
- * Extract tenant context from request
+ * Extract tenant context from request (without database lookup)
  */
-async function extractTenantContext(request: NextRequest) {
+function extractTenantContext(request: NextRequest) {
   try {
     const url = new URL(request.url);
-    let tenantIdentifier = null;
     
     // Method 1: Custom domain (e.g., tenant.com)
     const hostname = url.hostname;
     if (hostname && !isSystemDomain(hostname)) {
-      tenantIdentifier = { type: 'domain' as const, value: hostname };
+      return { type: 'domain' as const, slug: hostname };
     }
     
     // Method 2: Subdomain (e.g., tenant.yourapp.com)
-    if (!tenantIdentifier) {
-      const subdomain = extractSubdomain(hostname);
-      if (subdomain && subdomain !== 'www' && !isSystemSubdomain(subdomain)) {
-        tenantIdentifier = { type: 'slug' as const, value: subdomain };
-      }
+    const subdomain = extractSubdomain(hostname);
+    if (subdomain && subdomain !== 'www' && !isSystemSubdomain(subdomain)) {
+      return { type: 'subdomain' as const, slug: subdomain };
     }
     
     // Method 3: Path-based (e.g., yourapp.com/tenant/...)
-    if (!tenantIdentifier) {
-      const pathSegments = url.pathname.split('/').filter(Boolean);
-      if (pathSegments[0] && !isSystemPath(pathSegments[0])) {
-        const potentialSlug = pathSegments[0];
-        if (potentialSlug.match(/^[a-z0-9-]+$/)) {
-          tenantIdentifier = { type: 'slug' as const, value: potentialSlug };
-        }
+    const pathSegments = url.pathname.split('/').filter(Boolean);
+    if (pathSegments[0] && !isSystemPath(pathSegments[0])) {
+      const potentialSlug = pathSegments[0];
+      if (potentialSlug.match(/^[a-z0-9-]+$/)) {
+        return { type: 'path' as const, slug: potentialSlug };
       }
     }
     
     // Method 4: Header-based (for API calls)
-    if (!tenantIdentifier) {
-      const tenantHeader = request.headers.get('x-tenant-slug') || request.headers.get('x-tenant-id');
-      if (tenantHeader) {
-        tenantIdentifier = { type: 'slug' as const, value: tenantHeader };
-      }
+    const tenantHeader = request.headers.get('x-tenant-slug') || request.headers.get('x-tenant-id');
+    if (tenantHeader) {
+      return { type: 'header' as const, slug: tenantHeader };
     }
     
-    if (!tenantIdentifier) {
-      return null;
-    }
-    
-    // Look up tenant in database
-    const tenant = await prisma.tenant.findUnique({
-      where: tenantIdentifier.type === 'slug' 
-        ? { slug: tenantIdentifier.value }
-        : { domain: tenantIdentifier.value },
-      select: {
-        id: true,
-        slug: true,
-        status: true,
-        domain: true
-      }
-    });
-    
-    return tenant;
+    return null;
   } catch (error) {
     console.error('Error extracting tenant context:', error);
     return null;
