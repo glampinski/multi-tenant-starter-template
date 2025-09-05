@@ -1,5 +1,5 @@
 import { type DefaultSession } from "next-auth"
-import { UserRole } from "@prisma/client"
+import { UserRole, TenantStatus } from "@prisma/client"
 
 declare module "next-auth" {
   interface Session {
@@ -9,6 +9,22 @@ declare module "next-auth" {
       teamId: string | null
       lineagePath: string[]
       inviteVerified: boolean
+      // Tenant context
+      tenantId: string
+      tenant: {
+        id: string
+        name: string
+        slug: string
+        status: TenantStatus
+        plan: string
+      }
+      // For users with access to multiple tenants (future feature)
+      accessibleTenants?: Array<{
+        id: string
+        name: string
+        slug: string
+        role: UserRole
+      }>
     } & DefaultSession["user"]
   }
 
@@ -18,6 +34,7 @@ declare module "next-auth" {
     teamId?: string | null
     lineagePath?: string[]
     inviteVerified?: boolean
+    tenantId?: string
   }
 }
 
@@ -28,5 +45,13 @@ declare module "next-auth/jwt" {
     teamId: string | null
     lineagePath: string[]
     inviteVerified: boolean
+    tenantId: string
+    tenant: {
+      id: string
+      name: string
+      slug: string
+      status: TenantStatus
+      plan: string
+    }
   }
 }

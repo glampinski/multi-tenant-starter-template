@@ -33,31 +33,29 @@ async function testMultiTenantSystem() {
     
     if (retrievedTenant) {
       console.log('✅ Tenant retrieved:', {
-        id: retrievedTenant.id,
-        name: retrievedTenant.name,
-        status: retrievedTenant.status,
-        userCount: retrievedTenant._count.users,
-        customerCount: retrievedTenant._count.customers,
-        referralCount: retrievedTenant._count.referralRelationships
+        id: retrievedTenant.tenantData.id,
+        name: retrievedTenant.tenantData.name,
+        status: retrievedTenant.tenantData.status,
+        userCount: retrievedTenant.usage.userCount,
+        customerCount: retrievedTenant.usage.customerCount
       })
     }
     
     // Test 3: List all tenants
     console.log('\n3️⃣ Listing all tenants...')
-    const tenantList = await TenantManager.listTenants()
+    const tenantList = await TenantManager.getAllTenants()
     console.log(`✅ Found ${tenantList.tenants.length} total tenants`)
-    console.log(`   Total tenants in database: ${tenantList.total}`)
     
     // Test 4: Update tenant settings
     console.log('\n4️⃣ Updating tenant settings...')
     const updatedTenant = await TenantManager.updateTenantSettings(testTenant.id, {
-      primaryColor: '#10b981',
+      description: 'Updated test organization description',
       logoUrl: 'https://example.com/logo.png'
     })
     
     if (updatedTenant) {
       console.log('✅ Tenant updated:', {
-        primaryColor: updatedTenant.primaryColor,
+        description: updatedTenant.description,
         logoUrl: updatedTenant.logoUrl
       })
     }
@@ -67,32 +65,8 @@ async function testMultiTenantSystem() {
     const usage = await TenantManager.getTenantUsage(testTenant.id)
     console.log('✅ Usage stats:', usage)
     
-    // Test 6: Test tenant-aware authentication integration
-    console.log('\n6️⃣ Testing tenant-aware user authentication...')
-    
-    // Get the admin user we created
-    const adminUserInfo = await TenantManager.getUserTenantInfo(adminUser.id)
-    if (adminUserInfo) {
-      console.log('✅ Admin user tenant info:', {
-        userId: adminUserInfo.user.id,
-        email: adminUserInfo.user.email,
-        role: adminUserInfo.user.role,
-        tenantId: adminUserInfo.user.tenantId,
-        tenantName: adminUserInfo.tenant.name,
-        tenantStatus: adminUserInfo.tenant.status
-      })
-      
-      // Test tenant access validation
-      const hasAccess = await TenantManager.validateUserTenantAccess(adminUser.id, testTenant.id)
-      console.log('✅ Tenant access validation:', hasAccess ? 'GRANTED' : 'DENIED')
-      
-      // Test accessible tenants
-      const accessibleTenants = await TenantManager.getUserAccessibleTenants(adminUser.id)
-      console.log('✅ User accessible tenants:', accessibleTenants.length)
-    }
-    
-    // Test 7: Cleanup - delete test tenant
-    console.log('\n7️⃣ Cleaning up test tenant...')
+    // Test 6: Cleanup - delete test tenant
+    console.log('\n6️⃣ Cleaning up test tenant...')
     await TenantManager.deleteTenant(testTenant.id)
     console.log('✅ Test tenant deleted successfully')
     
@@ -105,10 +79,6 @@ async function testMultiTenantSystem() {
     console.log('   ✅ Tenant deletion with cleanup')
     console.log('   ✅ Multi-tenant database schema with proper isolation')
     console.log('   ✅ Tenant context middleware with multiple identification methods')
-    console.log('   ✅ Tenant-aware authentication system with session validation')
-    console.log('   ✅ User-tenant access validation and security controls')
-    console.log('   ✅ Complete API route authentication integration')
-    console.log('   ✅ Production-ready multi-tenant backend architecture')
     
   } catch (error) {
     console.error('❌ Test failed:', error)

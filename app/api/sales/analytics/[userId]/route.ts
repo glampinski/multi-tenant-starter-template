@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { withTenantContext, getTenantId } from '@/lib/tenant-context'
 import { hasPermission } from '@/lib/permissions'
+import { getSessionWithTenant } from '@/lib/session-utils'
 import { MODULES, ACTIONS } from '@/types/permissions'
 
 async function getSalesAnalyticsHandler(
@@ -16,19 +17,29 @@ async function getSalesAnalyticsHandler(
       return NextResponse.json({ error: 'Tenant context required' }, { status: 400 })
     }
 
-    // TODO: Get user profile from session for permission checks
-    // For now, we'll skip permission checks until we integrate tenant-aware auth
-    // const canViewSales = await hasPermission(
-    //   userProfile.id, 
-    //   tenantId,
-    //   teamId, 
-    //   MODULES.SALES, 
-    //   ACTIONS.VIEW
-    // )
+    // Get session with tenant context and validate permissions
+    const session = await getSessionWithTenant()
+    if (!session) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+    }
 
-    // if (!canViewSales) {
-    //   return NextResponse.json({ error: 'Forbidden: Insufficient permissions to view sales analytics' }, { status: 403 })
-    // }
+    // Verify session tenant matches request tenant
+    if (session.user.tenantId !== tenantId) {
+      return NextResponse.json({ error: 'Tenant access denied' }, { status: 403 })
+    }
+
+    // Check permissions for viewing sales analytics
+    const canViewSales = await hasPermission(
+      session.user.id, 
+      session.user.tenantId,
+      session.user.teamId || '', 
+      MODULES.SALES, 
+      ACTIONS.VIEW
+    )
+
+    if (!canViewSales) {
+      return NextResponse.json({ error: 'Permission denied' }, { status: 403 })
+    }
 
     const { searchParams } = new URL(enhancedReq.url)
     const timeframe = searchParams.get('timeframe') || '30d'
@@ -45,11 +56,10 @@ async function getSalesAnalyticsHandler(
       return NextResponse.json({ error: 'User not found in your organization' }, { status: 404 })
     }
 
-    // TODO: Add permission checks when we have session-based auth
-    // Check permissions - sales people can only see their own analytics
-    // if (userProfile.role === 'SALES_PERSON' && userId !== userProfile.id) {
-    //   return NextResponse.json({ error: 'Unauthorized to view this user\'s analytics' }, { status: 403 })
-    // }
+    // Additional authorization: users can only view their own analytics unless they're admin/super_admin
+    if (userId !== session.user.id && !['ADMIN', 'SUPER_ADMIN'].includes(session.user.role)) {
+      return NextResponse.json({ error: 'Can only view your own sales analytics' }, { status: 403 })
+    }
 
     const dateRange = getDateRange(timeframe)
     

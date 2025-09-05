@@ -3,8 +3,10 @@ import EmailProvider from "next-auth/providers/email"
 import { PrismaAdapter } from "@auth/prisma-adapter"
 import { nextAuthPrisma } from "@/lib/nextauth-prisma"
 import { prisma } from "@/lib/prisma"
+import { TenantManager } from "@/lib/tenant-manager"
 import type { Adapter } from "next-auth/adapters"
 import { sendVerificationRequest } from "@/lib/email"
+import { TenantStatus } from "@prisma/client"
 
 // Debug environment variables
 console.log('🔧 NextAuth Environment Check:');
@@ -28,40 +30,122 @@ export const authOptions: NextAuthOptions = {
   },
   callbacks: {
     async session({ session, user }) {
-      console.log('📝 Session callback:', { 
+      console.log('📝 Session callback - Building tenant-aware session:', { 
         email: session.user?.email, 
         userId: user?.id 
       });
       
       try {
         if (session.user?.email) {
-          // Try to find user profile
-          const userProfile = await prisma.userProfile.findFirst({
+          // Try to find user profile with tenant information
+          const userProfile = await (prisma.userProfile.findFirst as any)({
             where: { email: session.user.email },
           });
           
           if (userProfile) {
             console.log('👤 Found user profile:', { 
               id: userProfile.id, 
-              role: userProfile.role 
+              role: userProfile.role,
+              tenantId: userProfile.tenantId
             });
-            session.user.id = userProfile.id;
-            session.user.role = userProfile.role;
+
+            // Get detailed tenant information using TenantManager
+            const tenantInfo = await TenantManager.getUserTenantInfo(userProfile.id);
+            
+            if (tenantInfo) {
+              // Check if tenant is active
+              if (tenantInfo.tenant.status === 'SUSPENDED' || tenantInfo.tenant.status === 'EXPIRED') {
+                console.log('🚫 Tenant is suspended/expired:', tenantInfo.tenant.status);
+                throw new Error(`Tenant is ${tenantInfo.tenant.status.toLowerCase()}`);
+              }
+
+              // Build tenant-aware session
+              session.user.id = tenantInfo.user.id;
+              session.user.role = tenantInfo.user.role;
+              session.user.teamId = tenantInfo.user.teamId;
+              session.user.lineagePath = tenantInfo.user.lineagePath;
+              session.user.inviteVerified = tenantInfo.user.inviteVerified;
+              
+              // Add tenant context
+              session.user.tenantId = tenantInfo.user.tenantId;
+              session.user.tenant = {
+                id: tenantInfo.tenant.id,
+                name: tenantInfo.tenant.name,
+                slug: tenantInfo.tenant.slug,
+                status: tenantInfo.tenant.status,
+                plan: tenantInfo.tenant.plan
+              };
+
+              // Get accessible tenants for future multi-tenant support
+              session.user.accessibleTenants = await TenantManager.getUserAccessibleTenants(userProfile.id);
+
+              console.log('✅ Tenant-aware session built:', {
+                userId: session.user.id,
+                role: session.user.role,
+                tenantId: session.user.tenantId,
+                tenantName: session.user.tenant.name,
+                tenantStatus: session.user.tenant.status
+              });
+            } else {
+              console.log('⚠️ No tenant information found for user:', userProfile.id);
+              throw new Error('User has no associated tenant');
+            }
           } else {
             console.log('⚠️ No user profile found for:', session.user.email);
+            throw new Error('User profile not found');
           }
         }
       } catch (error) {
         console.error('❌ Session callback error:', error);
+        // For security, don't return a session if there are tenant/user issues
+        throw error;
       }
       
       return session;
     },
     async jwt({ token, user }) {
-      console.log('🔑 JWT callback:', { 
+      console.log('🔑 JWT callback - Building tenant-aware token:', { 
         tokenSub: token?.sub, 
         userId: user?.id 
       });
+      
+      // If user is signing in, populate the token with tenant information
+      if (user) {
+        try {
+          const userProfile = await (prisma.userProfile.findFirst as any)({
+            where: { email: user.email },
+          });
+          
+          if (userProfile) {
+            const tenantInfo = await TenantManager.getUserTenantInfo(userProfile.id);
+            
+            if (tenantInfo) {
+              token.id = tenantInfo.user.id;
+              token.role = tenantInfo.user.role;
+              token.teamId = tenantInfo.user.teamId;
+              token.lineagePath = tenantInfo.user.lineagePath;
+              token.inviteVerified = tenantInfo.user.inviteVerified;
+              token.tenantId = tenantInfo.user.tenantId;
+              token.tenant = {
+                id: tenantInfo.tenant.id,
+                name: tenantInfo.tenant.name,
+                slug: tenantInfo.tenant.slug,
+                status: tenantInfo.tenant.status,
+                plan: tenantInfo.tenant.plan
+              };
+
+              console.log('✅ JWT token built with tenant context:', {
+                userId: token.id,
+                tenantId: token.tenantId,
+                tenantStatus: token.tenant.status
+              });
+            }
+          }
+        } catch (error) {
+          console.error('❌ JWT callback error:', error);
+        }
+      }
+      
       return token;
     },
     async signIn({ user, account, profile, email, credentials }) {

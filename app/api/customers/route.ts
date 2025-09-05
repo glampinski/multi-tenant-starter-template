@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { withTenantContext, getTenantContext, getTenantId, createTenantScopedQueries } from '@/lib/tenant-context'
 import { hasPermission } from '@/lib/permissions'
+import { getSessionWithTenant } from '@/lib/session-utils'
 import { MODULES, ACTIONS } from '@/types/permissions'
 
 // GET: Fetch customers with tenant isolation and permission checks
@@ -15,9 +16,29 @@ async function getCustomers(req: NextRequest) {
         return NextResponse.json({ error: 'Tenant context required' }, { status: 400 })
       }
 
-      // TODO: Add session-based user authentication here
-      // For now, we'll skip permission checks until we integrate tenant-aware auth
-      // const canViewCustomers = await hasPermission(userId, teamId, MODULES.CUSTOMERS, ACTIONS.VIEW)
+      // Get session with tenant context and validate permissions
+      const session = await getSessionWithTenant()
+      if (!session) {
+        return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+      }
+
+      // Verify session tenant matches request tenant
+      if (session.user.tenantId !== tenantId) {
+        return NextResponse.json({ error: 'Tenant access denied' }, { status: 403 })
+      }
+
+      // Check permissions for viewing customers
+      const canViewCustomers = await hasPermission(
+        session.user.id, 
+        session.user.tenantId,
+        session.user.teamId || '', 
+        MODULES.CUSTOMERS, 
+        ACTIONS.VIEW
+      )
+
+      if (!canViewCustomers) {
+        return NextResponse.json({ error: 'Permission denied' }, { status: 403 })
+      }
 
       const { searchParams } = new URL(enhancedReq.url)
       const page = parseInt(searchParams.get('page') || '1')
@@ -28,7 +49,7 @@ async function getCustomers(req: NextRequest) {
 
       const skip = (page - 1) * limit
 
-      // Build tenant-scoped where clause
+            // Build tenant-scoped where clause
       let baseWhere: any = {
         tenantId // Always include tenant isolation
       }
@@ -49,36 +70,32 @@ async function getCustomers(req: NextRequest) {
       if (salesPersonId) {
         baseWhere.salesPersonId = salesPersonId
       }
-      const [customers, total] = await Promise.all([
-        prisma.customer.findMany({
+
+      // Get customers with tenant scoping
+      const [customers, totalCount] = await Promise.all([
+        (prisma.customer.findMany as any)({
           where: baseWhere,
+          skip,
+          take: limit,
+          orderBy: { createdAt: 'desc' },
           include: {
             salesPerson: {
-              select: {
-                firstName: true,
-                lastName: true,
-                email: true
-              }
-            },
-            activities: {
-              orderBy: { createdAt: 'desc' },
-              take: 5
+              select: { firstName: true, lastName: true, email: true }
             }
-          },
-          orderBy: { createdAt: 'desc' },
-          skip,
-          take: limit
+          }
         }),
-        prisma.customer.count({ where: baseWhere })
+        (prisma.customer.count as any)({ where: baseWhere })
       ])
+
+      const totalPages = Math.ceil(totalCount / limit)
 
       return NextResponse.json({
         customers,
         pagination: {
           page,
           limit,
-          total,
-          pages: Math.ceil(total / limit)
+          total: totalCount,
+          pages: totalPages
         }
       })
     } catch (error) {
@@ -92,13 +109,36 @@ async function getCustomers(req: NextRequest) {
 async function createCustomer(req: NextRequest) {
   return withTenantContext(req, async (enhancedReq) => {
     try {
+      const tenant = getTenantContext(enhancedReq)
       const tenantId = getTenantId(enhancedReq)
       
       if (!tenantId) {
         return NextResponse.json({ error: 'Tenant context required' }, { status: 400 })
       }
 
-      // TODO: Add session-based user authentication and permission checks here
+      // Get session with tenant context and validate permissions
+      const session = await getSessionWithTenant()
+      if (!session) {
+        return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+      }
+
+      // Verify session tenant matches request tenant
+      if (session.user.tenantId !== tenantId) {
+        return NextResponse.json({ error: 'Tenant access denied' }, { status: 403 })
+      }
+
+      // Check permissions for creating customers
+      const canCreateCustomers = await hasPermission(
+        session.user.id, 
+        session.user.tenantId,
+        session.user.teamId || '', 
+        MODULES.CUSTOMERS, 
+        ACTIONS.CREATE
+      )
+
+      if (!canCreateCustomers) {
+        return NextResponse.json({ error: 'Permission denied' }, { status: 403 })
+      }
       // const canCreateCustomers = await hasPermission(userId, teamId, MODULES.CUSTOMERS, ACTIONS.CREATE)
 
       const data = await enhancedReq.json()
@@ -126,7 +166,7 @@ async function createCustomer(req: NextRequest) {
       }
 
       // Check if email already exists within the tenant
-      const existingCustomer = await prisma.customer.findFirst({
+      const existingCustomer = await (prisma.customer.findFirst as any)({
         where: { 
           email,
           tenantId 
@@ -139,7 +179,7 @@ async function createCustomer(req: NextRequest) {
         }, { status: 400 })
       }
 
-      const customer = await prisma.customer.create({
+      const customer = await (prisma.customer.create as any)({
         data: {
           firstName,
           lastName,
@@ -153,7 +193,7 @@ async function createCustomer(req: NextRequest) {
           estimatedValue: estimatedValue ? parseFloat(estimatedValue) : null,
           notes,
           tags,
-          salesPersonId: salesPersonId || null, // TODO: Get from authenticated user session
+          salesPersonId: session.user.role === 'SALES_PERSON' ? session.user.id : (salesPersonId || null),
           tenantId
         },
         include: {
@@ -179,7 +219,6 @@ async function createCustomer(req: NextRequest) {
   })
 }
 
-// PUT: Update customer with team isolation and permission checks
 // PUT: Update customer with tenant isolation and permission checks
 async function updateCustomer(req: NextRequest) {
   return withTenantContext(req, async (enhancedReq) => {
@@ -190,8 +229,29 @@ async function updateCustomer(req: NextRequest) {
         return NextResponse.json({ error: 'Tenant context required' }, { status: 400 })
       }
 
-      // TODO: Add session-based user authentication and permission checks here
-      // const canEditCustomers = await hasPermission(userId, teamId, MODULES.CUSTOMERS, ACTIONS.EDIT)
+      // Get session with tenant context and validate permissions
+      const session = await getSessionWithTenant()
+      if (!session) {
+        return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+      }
+
+      // Verify session tenant matches request tenant
+      if (session.user.tenantId !== tenantId) {
+        return NextResponse.json({ error: 'Tenant access denied' }, { status: 403 })
+      }
+
+      // Check permissions for updating customers
+      const canEditCustomers = await hasPermission(
+        session.user.id, 
+        session.user.tenantId,
+        session.user.teamId || '', 
+        MODULES.CUSTOMERS, 
+        ACTIONS.EDIT
+      )
+
+      if (!canEditCustomers) {
+        return NextResponse.json({ error: 'Permission denied' }, { status: 403 })
+      }
 
       const data = await enhancedReq.json()
       const { id, ...updateData } = data
@@ -201,7 +261,7 @@ async function updateCustomer(req: NextRequest) {
       }
 
       // Check if customer exists and belongs to user's tenant
-      const existingCustomer = await prisma.customer.findFirst({
+      const existingCustomer = await (prisma.customer.findFirst as any)({
         where: { 
           id,
           tenantId 
@@ -212,11 +272,10 @@ async function updateCustomer(req: NextRequest) {
         return NextResponse.json({ error: 'Customer not found in your organization' }, { status: 404 })
       }
 
-      // TODO: Add role-based access control here
-      // Check permissions - sales people can only update their customers
-      // if (userRole === 'SALES_PERSON' && existingCustomer.salesPersonId !== userId) {
-      //   return NextResponse.json({ error: 'Unauthorized to update this customer' }, { status: 403 })
-      // }
+      // Role-based access control - sales people can only update their customers
+      if (session.user.role === 'SALES_PERSON' && existingCustomer.salesPersonId !== session.user.id) {
+        return NextResponse.json({ error: 'Unauthorized to update this customer' }, { status: 403 })
+      }
       // Clean update data
       if (updateData.estimatedValue) {
         updateData.estimatedValue = parseFloat(updateData.estimatedValue)
@@ -262,8 +321,29 @@ async function deleteCustomer(req: NextRequest) {
         return NextResponse.json({ error: 'Tenant context required' }, { status: 400 })
       }
 
-      // TODO: Add session-based user authentication and permission checks here
-      // const canDeleteCustomers = await hasPermission(userId, teamId, MODULES.CUSTOMERS, ACTIONS.DELETE)
+      // Get session with tenant context and validate permissions
+      const session = await getSessionWithTenant()
+      if (!session) {
+        return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+      }
+
+      // Verify session tenant matches request tenant
+      if (session.user.tenantId !== tenantId) {
+        return NextResponse.json({ error: 'Tenant access denied' }, { status: 403 })
+      }
+
+      // Check permissions for deleting customers
+      const canDeleteCustomers = await hasPermission(
+        session.user.id, 
+        session.user.tenantId,
+        session.user.teamId || '', 
+        MODULES.CUSTOMERS, 
+        ACTIONS.DELETE
+      )
+
+      if (!canDeleteCustomers) {
+        return NextResponse.json({ error: 'Permission denied' }, { status: 403 })
+      }
 
       const { searchParams } = new URL(enhancedReq.url)
       const customerId = searchParams.get('id')
@@ -273,7 +353,7 @@ async function deleteCustomer(req: NextRequest) {
       }
 
       // Check if customer exists and belongs to user's tenant
-      const existingCustomer = await prisma.customer.findFirst({
+      const existingCustomer = await (prisma.customer.findFirst as any)({
         where: { 
           id: customerId,
           tenantId 
@@ -284,11 +364,10 @@ async function deleteCustomer(req: NextRequest) {
         return NextResponse.json({ error: 'Customer not found in your organization' }, { status: 404 })
       }
 
-      // TODO: Add role-based access control here
-      // Check permissions - sales people can only delete their customers
-      // if (userRole === 'SALES_PERSON' && existingCustomer.salesPersonId !== userId) {
-      //   return NextResponse.json({ error: 'Unauthorized to delete this customer' }, { status: 403 })
-      // }
+      // Role-based access control - sales people can only delete their customers
+      if (session.user.role === 'SALES_PERSON' && existingCustomer.salesPersonId !== session.user.id) {
+        return NextResponse.json({ error: 'Unauthorized to delete this customer' }, { status: 403 })
+      }
 
       await prisma.customer.delete({
         where: { id: customerId }

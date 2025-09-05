@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { withTenantContext, getTenantContext, getTenantId } from '@/lib/tenant-context'
+import { hasPermission } from '@/lib/permissions'
+import { getSessionWithTenant } from '@/lib/session-utils'
+import { MODULES, ACTIONS } from '@/types/permissions'
 
 // GET: Fetch referral analytics with tenant isolation
 async function getReferralAnalytics(
@@ -17,6 +20,30 @@ async function getReferralAnalytics(
         return NextResponse.json({ error: 'Tenant context required' }, { status: 400 })
       }
 
+      // Get session with tenant context and validate permissions
+      const session = await getSessionWithTenant()
+      if (!session) {
+        return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+      }
+
+      // Verify session tenant matches request tenant
+      if (session.user.tenantId !== tenantId) {
+        return NextResponse.json({ error: 'Tenant access denied' }, { status: 403 })
+      }
+
+      // Check permissions for viewing referral analytics
+      const canViewReferrals = await hasPermission(
+        session.user.id, 
+        session.user.tenantId,
+        session.user.teamId || '', 
+        MODULES.REFERRALS, 
+        ACTIONS.VIEW
+      )
+
+      if (!canViewReferrals) {
+        return NextResponse.json({ error: 'Permission denied' }, { status: 403 })
+      }
+
       // Validate that the target user is in the same tenant
       const targetUser = await prisma.userProfile.findFirst({
         where: {
@@ -29,8 +56,10 @@ async function getReferralAnalytics(
         return NextResponse.json({ error: 'User not found in this tenant' }, { status: 404 })
       }
 
-      // TODO: Add session-based user authentication and permission checks
-      // For now, we'll allow all analytics viewing within the tenant
+      // Additional authorization: users can only view their own analytics unless they're admin/super_admin
+      if (userId !== session.user.id && !['ADMIN', 'SUPER_ADMIN'].includes(session.user.role)) {
+        return NextResponse.json({ error: 'Can only view your own referral analytics' }, { status: 403 })
+      }
 
       const { searchParams } = new URL(enhancedReq.url)
       const timeframe = searchParams.get('timeframe') || '30d'

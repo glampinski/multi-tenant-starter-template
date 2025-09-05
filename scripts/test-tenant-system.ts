@@ -1,10 +1,10 @@
-import { TenantManager } from '@/lib/tenant-manager'
+import { TenantManager } from '../lib/tenant-manager'
 
 async function testMultiTenantSystem() {
   console.log('🧪 Testing Multi-Tenant System Implementation...\n')
   
   try {
-        // Test 1: Create a test tenant
+    // Test 1: Create a test tenant
     console.log('1️⃣ Creating test tenant...')
     const result = await TenantManager.createTenant({
       name: 'Test Organization',
@@ -117,4 +117,4 @@ async function testMultiTenantSystem() {
 }
 
 // Run the test
-testMultiTenantSystem()
+testMultiTenantSystem().catch(console.error)

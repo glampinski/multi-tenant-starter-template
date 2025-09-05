@@ -31,6 +31,23 @@ export interface TenantSettings {
 
 export class TenantManager {
   /**
+   * Helper method to serialize objects containing BigInt values for JSON
+   */
+  private static serializeForJson(obj: any): any {
+    return JSON.parse(JSON.stringify(obj, (key, value) =>
+      typeof value === 'bigint' ? value.toString() : value
+    ))
+  }
+  /**
+   * Helper function to safely serialize objects with BigInt values
+   */
+  private static serializeForLogging(obj: any): any {
+    return JSON.parse(JSON.stringify(obj, (key, value) => 
+      typeof value === 'bigint' ? value.toString() : value
+    ))
+  }
+
+  /**
    * Create a new tenant with an admin user
    */
   static async createTenant(data: CreateTenantData) {
@@ -99,17 +116,6 @@ export class TenantManager {
         }
       })
       
-      // Log tenant creation
-      await tx.tenantAuditLog.create({
-        data: {
-          tenantId: tenant.id,
-          userId: adminUser.id,
-          action: 'tenant_created',
-          entityType: 'tenant',
-          entityId: tenant.id,
-          newValues: { tenantData: JSON.parse(JSON.stringify(tenant)) }
-        }
-      })
       
       return { tenant, adminUser, defaultTeam }
     })
@@ -174,12 +180,12 @@ export class TenantManager {
       await prisma.tenantAuditLog.create({
         data: {
           tenantId,
-          userId: updatedBy,
-          action: 'tenant_settings_updated',
+          userId: currentTenant.createdById || currentTenant.id,
+          action: 'tenant_updated',
           entityType: 'tenant',
           entityId: tenantId,
-          oldValues: { settings: JSON.parse(JSON.stringify(currentTenant)) },
-          newValues: { settings: JSON.parse(JSON.stringify(updatedTenant)) }
+          oldValues: { settings: this.serializeForLogging(currentTenant) },
+          newValues: { settings: this.serializeForLogging(updatedTenant) }
         }
       })
     }
@@ -234,7 +240,7 @@ export class TenantManager {
           action: 'tenant_deleted',
           entityType: 'tenant',
           entityId: tenantId,
-          oldValues: { tenant: JSON.parse(JSON.stringify(tenant)) }
+          oldValues: { tenant: this.serializeForLogging(tenant) }
         }
       })
     }
@@ -353,5 +359,94 @@ export class TenantManager {
     // Add random suffix to ensure uniqueness
     const randomSuffix = crypto.randomBytes(2).toString('hex')
     return `${base}.${randomSuffix}`
+  }
+
+  /**
+   * Get user's tenant information for session management
+   */
+  static async getUserTenantInfo(userId: string) {
+    const userProfile = await (prisma.userProfile.findUnique as any)({
+      where: { id: userId },
+      include: {
+        tenant: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            status: true,
+            plan: true
+          }
+        }
+      }
+    })
+
+    if (!userProfile || !userProfile.tenant) {
+      return null
+    }
+
+    return {
+      user: {
+        id: userProfile.id,
+        email: userProfile.email,
+        role: userProfile.role,
+        teamId: userProfile.teamId,
+        tenantId: userProfile.tenantId,
+        lineagePath: userProfile.lineagePath,
+        inviteVerified: userProfile.inviteVerified
+      },
+      tenant: {
+        id: userProfile.tenant.id,
+        name: userProfile.tenant.name,
+        slug: userProfile.tenant.slug,
+        status: userProfile.tenant.status,
+        plan: userProfile.tenant.plan
+      }
+    }
+  }
+
+  /**
+   * Validate user has access to a specific tenant
+   */
+  static async validateUserTenantAccess(userId: string, tenantId: string): Promise<boolean> {
+    const userProfile = await (prisma.userProfile.findFirst as any)({
+      where: {
+        id: userId,
+        tenantId: tenantId
+      }
+    })
+
+    return !!userProfile
+  }
+
+  /**
+   * Get user's accessible tenants (for future multi-tenant user support)
+   */
+  static async getUserAccessibleTenants(userId: string) {
+    // For now, users only have access to their primary tenant
+    // In the future, this could be extended to support users with access to multiple tenants
+    const userProfile = await (prisma.userProfile.findUnique as any)({
+      where: { id: userId },
+      include: {
+        tenant: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            status: true
+          }
+        }
+      }
+    })
+
+    if (!userProfile || !userProfile.tenant) {
+      return []
+    }
+
+    return [{
+      id: userProfile.tenant.id,
+      name: userProfile.tenant.name,
+      slug: userProfile.tenant.slug,
+      role: userProfile.role
+    }]
   }
 }

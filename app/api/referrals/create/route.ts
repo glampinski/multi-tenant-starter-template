@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { withTenantContext, getTenantContext, getTenantId } from '@/lib/tenant-context'
 import { hasPermission } from '@/lib/permissions'
+import { getSessionWithTenant } from '@/lib/session-utils'
 import { MODULES, ACTIONS } from '@/types/permissions'
 
 // POST: Create referral with tenant isolation
@@ -15,9 +16,29 @@ async function createReferral(req: NextRequest) {
         return NextResponse.json({ error: 'Tenant context required' }, { status: 400 })
       }
 
-      // TODO: Add session-based user authentication here
-      // For now, we'll skip permission checks until we integrate tenant-aware auth
-      // const canCreateReferrals = await hasPermission(userProfile.id, tenantId, MODULES.REFERRALS, ACTIONS.CREATE)
+      // Get session with tenant context and validate permissions
+      const session = await getSessionWithTenant()
+      if (!session) {
+        return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+      }
+
+      // Verify session tenant matches request tenant
+      if (session.user.tenantId !== tenantId) {
+        return NextResponse.json({ error: 'Tenant access denied' }, { status: 403 })
+      }
+
+      // Check permissions for creating referrals
+      const canCreateReferrals = await hasPermission(
+        session.user.id, 
+        session.user.tenantId,
+        session.user.teamId || '', 
+        MODULES.REFERRALS, 
+        ACTIONS.CREATE
+      )
+
+      if (!canCreateReferrals) {
+        return NextResponse.json({ error: 'Permission denied' }, { status: 403 })
+      }
 
       const { referredUserId, referrerId } = await enhancedReq.json()
 

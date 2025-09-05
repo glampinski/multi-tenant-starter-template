@@ -7,6 +7,8 @@ const globalForPrisma = globalThis as unknown as {
 export const prisma = globalForPrisma.prisma ?? new PrismaClient({
   // Configure connection pooling for better stability
   log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
+  // Disable prepared statements for Supabase pooler compatibility
+  datasourceUrl: process.env.DATABASE_URL + '?pgbouncer=true&connection_limit=1',
 })
 
 if (process.env.NODE_ENV !== 'production') {
