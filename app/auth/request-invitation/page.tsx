@@ -82,12 +82,12 @@ export default function RequestInvitation() {
               </Title>
 
               <Text ta="center" c="dimmed" size="md">
-                Thank you for your interest! We've received your invitation request and our team will review it soon.
+                Thank you for your interest! We&apos;ve received your invitation request and our team will review it soon.
               </Text>
 
               <Alert icon={<IconMail size={16} />} color="blue" style={{ width: '100%' }}>
                 <Text size="sm">
-                  You'll receive an email confirmation shortly. Our team typically reviews requests within 1-2 business days.
+                  You&apos;ll receive an email confirmation shortly. Our team typically reviews requests within 1-2 business days.
                 </Text>
               </Alert>
 
@@ -132,7 +132,7 @@ export default function RequestInvitation() {
                 Request Platform Access
               </Title>
               <Text ta="center" c="dimmed" size="md">
-                Fill out this form and we'll review your request for platform access.
+                Fill out this form and we&apos;ll review your request for platform access.
               </Text>
             </div>
 

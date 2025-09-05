@@ -39,7 +39,7 @@ export default function AccessDenied() {
 
             {/* Description */}
             <Text ta="center" c="dimmed" size="md">
-              We couldn't find your account in our system. This usually means you haven't been invited to this platform yet.
+              We couldn&apos;t find your account in our system. This usually means you haven&apos;t been invited to this platform yet.
             </Text>
 
             {/* What this means list */}
@@ -48,7 +48,7 @@ export default function AccessDenied() {
                 This could happen if:
               </Text>
               <List size="sm" spacing="xs" c="dimmed">
-                <List.Item>You haven't received an invitation yet</List.Item>
+                <List.Item>You haven&apos;t received an invitation yet</List.Item>
                 <List.Item>Your invitation is still being processed</List.Item>
                 <List.Item>There was a typo in your email address</List.Item>
               </List>

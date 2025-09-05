@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useImpersonation } from '@/hooks/useImpersonation';
 import { useRolePermissions } from '@/hooks/useRolePermissions';
 import { Button } from '@/components/ui/button';
@@ -33,7 +33,7 @@ export function UserImpersonationSelector({ teamId }: UserImpersonationSelectorP
   const hasImpersonationPermission = canImpersonate; // TODO: make this team-specific
 
   // Fetch available users for impersonation
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     if (!hasImpersonationPermission) return;
     
     setLoading(true);
@@ -48,11 +48,11 @@ export function UserImpersonationSelector({ teamId }: UserImpersonationSelectorP
     } finally {
       setLoading(false);
     }
-  };
+  }, [teamId, hasImpersonationPermission]);
 
   useEffect(() => {
     fetchUsers();
-  }, [teamId, hasImpersonationPermission]);
+  }, [fetchUsers]);
 
   const handleImpersonate = () => {
     const selectedUser = users.find(u => u.id === selectedUserId);

@@ -36,7 +36,7 @@ import {
 } from '@tabler/icons-react';
 import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 interface Invitation {
   id: string;
@@ -62,11 +62,7 @@ export default function InvitePage() {
     role: 'SALES_PERSON' as 'ADMIN' | 'MANAGER' | 'SALES_PERSON' | 'CUSTOMER'
   });
 
-  useEffect(() => {
-    loadInvitations();
-  }, []);
-
-  const loadInvitations = async () => {
+  const loadInvitations = useCallback(async () => {
     try {
       setLoading(true);
       
@@ -119,7 +115,11 @@ export default function InvitePage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [session?.user?.name]);
+
+  useEffect(() => {
+    loadInvitations();
+  }, [loadInvitations]);
 
   const handleEdit = (invitation: Invitation) => {
     setEditingInvitation(invitation);
