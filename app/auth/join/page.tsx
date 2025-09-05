@@ -16,24 +16,50 @@ export default function JoinPage() {
   const [error, setError] = useState('');
   const [inviteData, setInviteData] = useState<any>(null);
   
-  const token = searchParams.get('token');
+  const tokenId = searchParams.get('id'); // Use 'id' instead of full token
   const email = searchParams.get('email');
 
   useEffect(() => {
-    if (!token) {
-      setError('Invalid invitation link - missing token');
+    if (!tokenId) {
+      setError('Invalid invitation link - missing token ID');
       return;
     }
 
-    // In a real implementation, you would validate the token here
-    // For now, we'll just set some mock data
-    setInviteData({
-      token,
-      email: email || '',
-      role: 'SALES_REP',
-      teamName: 'Main Team'
-    });
-  }, [token, email]);
+    // Validate token ID securely without exposing the full token
+    const validateInvitation = async () => {
+      try {
+        const response = await fetch('/api/auth/validate-invite', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ 
+            token: tokenId, // The API expects 'token' but we're sending the safe ID
+          }),
+        });
+
+        const result = await response.json();
+        
+        if (result.isValid && result.invite) {
+          setInviteData({
+            tokenId,
+            email: result.invite.email || email || '',
+            role: result.invite.role,
+            teamName: result.invite.tenant?.name || 'Main Team',
+            inviterName: `${result.invite.inviter?.firstName || ''} ${result.invite.inviter?.lastName || ''}`.trim(),
+            expiresAt: result.invite.expiresAt
+          });
+        } else {
+          setError(result.message || 'Invalid or expired invitation');
+        }
+      } catch (error) {
+        console.error('Failed to validate invitation:', error);
+        setError('Failed to validate invitation. Please try again.');
+      }
+    };
+
+    validateInvitation();
+  }, [tokenId, email]);
 
   const handleJoin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -45,8 +71,8 @@ export default function JoinPage() {
 
     try {
       // For this invitation system, we'll redirect to the signin page
-      // with the email pre-filled and a callback URL that includes the invitation token
-      const callbackUrl = `/welcome?token=${token}&invited=true`;
+      // with the email pre-filled and a callback URL that includes the invitation token ID
+      const callbackUrl = `/welcome?tokenId=${tokenId}&invited=true`;
       
       // Trigger magic link authentication
       const result = await signIn('email', {
@@ -69,7 +95,7 @@ export default function JoinPage() {
     }
   };
 
-  if (!token || error) {
+  if (!tokenId || error) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
         <Card className="w-full max-w-md">

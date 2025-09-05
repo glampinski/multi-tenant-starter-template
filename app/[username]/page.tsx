@@ -1,7 +1,8 @@
 import { redirect } from 'next/navigation';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
-import { ROLES } from '@/types/permissions';
+import { prisma } from '@/lib/prisma';
+import { UserRole } from '@prisma/client';
 
 interface Props {
   params: Promise<{ username: string }>;
@@ -12,48 +13,67 @@ export default async function UsernameReferralPage({ params, searchParams }: Pro
   const { username } = await params;
   const { role } = await searchParams;
 
-  // For demo purposes, we'll validate against referral-enabled usernames
-  // In production, you'd check your database for valid referral users
-  const validReferralUsers = [
-    { username: 'demo', role: ROLES.CUSTOMER },
-    { username: 'alice', role: ROLES.CUSTOMER },
-    { username: 'bob', role: ROLES.SALES_PERSON },
-    { username: 'john', role: ROLES.CUSTOMER },
-    { username: 'sales', role: ROLES.SALES_PERSON },
-    { username: 'customer1', role: ROLES.CUSTOMER },
-    { username: 'test', role: ROLES.CUSTOMER }
-  ];
-  
-  const referralUser = validReferralUsers.find(u => u.username.toLowerCase() === username.toLowerCase());
-  
-  if (!referralUser) {
-    // Username not found or not authorized for referrals - redirect to home page
-    redirect('/?error=invalid-referral-link');
-  }
-
-  // Only customers and sales people can create referral links
-  if (![ROLES.CUSTOMER, ROLES.SALES_PERSON].includes(referralUser.role)) {
-    redirect('/?error=referral-not-available');
-  }
-
-  // Get the current user session to see if they're already signed in
-  const session = await getServerSession(authOptions);
-  
-  if (session) {
-    // User is already signed in, redirect to dashboard with referral context
-    redirect(`/dashboard?ref=${username}&referrer=${username}&type=referral`);
-  } else {
-    // User not signed in, redirect to customer referral signup
-    const customSignUpUrl = '/signup';
-    const searchParams = new URLSearchParams();
-    searchParams.set('ref', username);
-    searchParams.set('type', 'referral');
-    searchParams.set('target_role', ROLES.CUSTOMER); // Referrals default to customer
-    if (referralUser.role) {
-      searchParams.set('referrer_role', referralUser.role);
-    }
+  try {
+    // Look up the user by their actual username
+    const referralUser = await prisma.userProfile.findUnique({
+      where: { 
+        username: username.toLowerCase() // Find by actual username
+      },
+      select: {
+        id: true,
+        username: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        tenantId: true,
+        tenant: {
+          select: {
+            name: true,
+            status: true
+          }
+        }
+      }
+    });
     
-    redirect(`${customSignUpUrl}?${searchParams.toString()}`);
+    if (!referralUser) {
+      // Username not found - redirect to home page
+      redirect('/?error=invalid-referral-link');
+    }
+
+    // Check if tenant is active
+    if (referralUser.tenant.status !== 'ACTIVE') {
+      redirect('/?error=tenant-inactive');
+    }
+
+    // Only customers, sales people, and super admins can create referral links
+    if (referralUser.role !== UserRole.CUSTOMER && 
+        referralUser.role !== UserRole.SALES_PERSON && 
+        referralUser.role !== UserRole.SUPER_ADMIN) {
+      redirect('/?error=referral-not-available');
+    }
+
+    // Get the current user session to see if they're already signed in
+    const session = await getServerSession(authOptions);
+    
+    if (session) {
+      // User is already signed in, redirect to dashboard with referral context
+      redirect(`/dashboard?ref=${referralUser.username || referralUser.id}&referrer=${referralUser.id}&type=referral`);
+    } else {
+      // User not signed in, redirect to customer referral signup
+      const customSignUpUrl = '/signup';
+      const signUpParams = new URLSearchParams();
+      signUpParams.set('ref', referralUser.username || referralUser.id);
+      signUpParams.set('type', 'referral');
+      signUpParams.set('target_role', UserRole.CUSTOMER); // Referrals default to customer
+      if (referralUser.role) {
+        signUpParams.set('referrer_role', referralUser.role);
+      }
+      
+      redirect(`${customSignUpUrl}?${signUpParams.toString()}`);
+    }
+  } catch (error) {
+    console.error('Error processing referral link:', error);
+    redirect('/?error=system-error');
   }
 }
 
@@ -61,13 +81,35 @@ export default async function UsernameReferralPage({ params, searchParams }: Pro
 export async function generateMetadata({ params }: Props) {
   const { username } = await params;
   
-  return {
-    title: `Join ${username} on our platform`,
-    description: `${username} has invited you to join our platform. Sign up to get started!`,
-    openGraph: {
+  try {
+    const referralUser = await prisma.userProfile.findUnique({
+      where: { 
+        username: username.toLowerCase()
+      },
+      select: {
+        username: true,
+        firstName: true,
+        lastName: true
+      }
+    });
+
+    const displayName = referralUser 
+      ? `${referralUser.firstName || ''} ${referralUser.lastName || ''}`.trim() || referralUser.username
+      : username;
+
+    return {
+      title: `Join ${displayName} on our platform`,
+      description: `${displayName} has invited you to join our platform. Sign up to get started!`,
+      openGraph: {
+        title: `Join ${displayName} on our platform`,
+        description: `${displayName} has invited you to join our platform. Sign up to get started!`,
+        url: `https://yourapp.com/${username}`,
+      },
+    };
+  } catch (error) {
+    return {
       title: `Join ${username} on our platform`,
-      description: `${username} has invited you to join our platform. Sign up to get started!`,
-      url: `https://yourapp.com/${username}`,
-    },
-  };
+      description: `You've been invited to join our platform. Sign up to get started!`,
+    };
+  }
 }

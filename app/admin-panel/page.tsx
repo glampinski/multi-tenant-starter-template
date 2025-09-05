@@ -319,7 +319,7 @@ export default function SuperAdminPanel() {
     setLoading(false);
   };
 
-  // Generate invite link
+  // Generate invite link (now uses simple username format)
   const handleGenerateInviteLink = async () => {
     setLoading(true);
     try {
@@ -337,6 +337,24 @@ export default function SuperAdminPanel() {
       if (response.ok) {
         const result = await response.json();
         setInviteLink(result.inviteLink);
+        
+        // Try to copy to clipboard with fallback
+        try {
+          await navigator.clipboard.writeText(result.inviteLink);
+          notifications.show({
+            title: 'Success',
+            message: 'Invite link copied to clipboard',
+            color: 'green',
+          });
+        } catch (clipboardError) {
+          // Fallback: just show success without clipboard
+          notifications.show({
+            title: 'Success',
+            message: 'Invite link generated successfully',
+            color: 'green',
+          });
+        }
+        
         openLinkModal();
       } else {
         throw new Error('Failed to generate invite link');
@@ -352,13 +370,37 @@ export default function SuperAdminPanel() {
   };
 
   // Copy invite link to clipboard
-  const handleCopyLink = () => {
-    navigator.clipboard.writeText(inviteLink);
-    notifications.show({
-      title: 'Copied!',
-      message: 'Invite link copied to clipboard',
-      color: 'green',
-    });
+  const handleCopyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(inviteLink);
+      notifications.show({
+        title: 'Copied!',
+        message: 'Invite link copied to clipboard',
+        color: 'green',
+      });
+    } catch (error) {
+      // Fallback: select the text for manual copy
+      const textArea = document.createElement('textarea');
+      textArea.value = inviteLink;
+      document.body.appendChild(textArea);
+      textArea.select();
+      try {
+        document.execCommand('copy');
+        notifications.show({
+          title: 'Copied!',
+          message: 'Invite link copied to clipboard',
+          color: 'green',
+        });
+      } catch (fallbackError) {
+        notifications.show({
+          title: 'Copy Failed',
+          message: 'Please manually copy the link from the text field',
+          color: 'orange',
+        });
+      } finally {
+        document.body.removeChild(textArea);
+      }
+    }
   };
 
   // Create new team
@@ -572,12 +614,12 @@ export default function SuperAdminPanel() {
                 </Button>
               </Card>
               <Card shadow="sm" padding="lg" radius="md" withBorder>
-                <Title order={3} mb="md">Invite Links</Title>
+                <Title order={3} mb="md">Your Referral Link</Title>
                 <Text c="dimmed" mb="lg">
-                  Generate shareable invite links for team registration.
+                  Generate your simple, clean referral link to share with others.
                 </Text>
                 <Button fullWidth leftSection={<IconLink size={16} />} onClick={handleGenerateInviteLink}>
-                  Generate Invite Link
+                  Get My Referral Link
                 </Button>
               </Card>
             </SimpleGrid>

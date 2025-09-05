@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { randomBytes } from 'crypto';
 
 export async function POST(req: NextRequest) {
   try {
@@ -15,19 +14,35 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { teamId, role = 'SALES_REP' } = await req.json();
+    // Get admin's profile to create their personal referral link
+    const adminProfile = await prisma.userProfile.findUnique({
+      where: { email: session.user.email! },
+      select: {
+        username: true,
+        firstName: true,
+        lastName: true,
+        role: true
+      }
+    });
 
-    // Generate unique invite token
-    const inviteToken = randomBytes(32).toString('hex');
+    if (!adminProfile) {
+      return NextResponse.json(
+        { error: 'Admin profile not found' },
+        { status: 404 }
+      );
+    }
 
-    // Create invite URL
-    const inviteUrl = `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/auth/join?token=${inviteToken}`;
+    // Generate simple username-based referral link
+    const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
+    const inviteUrl = `${baseUrl}/${adminProfile.username}`;
 
     return NextResponse.json({ 
       success: true,
       inviteLink: inviteUrl,
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
-      maxUses: 10
+      userInfo: {
+        name: `${adminProfile.firstName || ''} ${adminProfile.lastName || ''}`.trim() || adminProfile.username,
+        role: adminProfile.role
+      }
     });
 
   } catch (error) {

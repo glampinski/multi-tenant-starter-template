@@ -33,7 +33,7 @@ A complete multi-tenant SaaS platform with:
 
 ### **Phase 3: Referral System** ✅ **COMPLETE**
 - Multi-tier referral system (5 levels deep)
-- Username-based referral links (`yourapp.com/username`)
+- User ID-based referral links (`yourapp.com/ref/user-id`) - Secure & Simple
 - Dual invitation system (email for employees, referrals for customers)
 - Role-based referral visibility and management
 - Custom referral signup flows
@@ -170,7 +170,7 @@ A complete multi-tenant SaaS platform with:
 ### **Key Design Decisions**
 - **Tenant Isolation**: Database-level isolation for security
 - **Permission System**: Role-based with tenant-aware enforcement
-- **Referral Architecture**: Username-based links with multi-tier tracking
+- **Referral Architecture**: User ID-based links with multi-tier tracking
 - **Authentication Flow**: Invitation-based signup for security
 
 ### **Technical Debt Status**
@@ -227,7 +227,7 @@ npm run db:migrate   # Run database migrations
 ### **Core Features Available**
 1. **Multi-Tenant Architecture**: Complete isolation and tenant switching
 2. **5-Role Permission System**: super_admin, admin, employee, sales_person, customer
-3. **Referral System**: Multi-tier tracking with username-based links
+3. **Referral System**: Multi-tier tracking with user ID-based links
 4. **Sales Analytics**: Real-time metrics and performance tracking
 5. **Customer Management**: Complete CRM functionality
 6. **Invitation System**: Email-based team building with role assignment
