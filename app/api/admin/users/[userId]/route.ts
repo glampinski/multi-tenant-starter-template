@@ -4,71 +4,85 @@ import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 import { hasPermission } from '@/lib/permissions'
 import { MODULES, ACTIONS, ROLES } from '@/types/permissions'
+import { withTenantContext, getTenantId } from '@/lib/tenant-context'
 
 // GET: Get user details for role editing
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ userId: string }> }
 ) {
-  try {
-    const session = await getServerSession(authOptions)
-    const { userId } = await params
-    
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Get admin user profile
-    const adminProfile = await prisma.userProfile.findUnique({
-      where: { id: session.user.id },
-      select: { role: true, teamId: true }
-    })
-
-    if (!adminProfile) {
-      return NextResponse.json({ error: 'Admin profile not found' }, { status: 404 })
-    }
-
-    // Check if user has permission to manage team
-    const canManageTeam = await hasPermission(
-      session.user.id, 
-      adminProfile.teamId!, 
-      MODULES.TEAM_MANAGEMENT, 
-      ACTIONS.MANAGE
-    )
-
-    if (!canManageTeam) {
-      return NextResponse.json({ error: 'Forbidden: Insufficient permissions to manage users' }, { status: 403 })
-    }
-
-    // Fetch the target user
-    const user = await prisma.userProfile.findFirst({
-      where: { 
-        id: userId,
-        teamId: adminProfile.teamId // Ensure user is in same team
+  return withTenantContext(req, async (enhancedReq) => {
+    try {
+      const session = await getServerSession(authOptions)
+      const { userId } = await params
+      const tenantId = getTenantId(enhancedReq)
+      
+      if (!session?.user?.id) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
       }
-    })
 
-    if (!user) {
-      return NextResponse.json({ error: 'User not found in your team' }, { status: 404 })
-    }
-
-    return NextResponse.json({ 
-      success: true,
-      user: {
-        id: user.id,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-        username: user.username,
-        role: user.role,
-        teamId: user.teamId,
-        createdAt: user.createdAt
+      if (!tenantId) {
+        return NextResponse.json({ error: 'Tenant context required' }, { status: 400 })
       }
-    })
-  } catch (error) {
-    console.error('Error fetching user for role edit:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
-  }
+
+      // Get admin user profile with tenant isolation
+      const adminProfile = await (prisma.userProfile.findFirst as any)({
+        where: { 
+          id: session.user.id,
+          tenantId
+        },
+        select: { role: true, teamId: true }
+      })
+
+      if (!adminProfile) {
+        return NextResponse.json({ error: 'Admin profile not found' }, { status: 404 })
+      }
+
+      // Check if user has permission to manage team
+      const canManageTeam = await hasPermission(
+        session.user.id, 
+        tenantId,
+        adminProfile.teamId!, 
+        MODULES.TEAM_MANAGEMENT, 
+        ACTIONS.MANAGE
+      )
+
+      if (!canManageTeam) {
+        return NextResponse.json({ error: 'Forbidden: Insufficient permissions to manage users' }, { status: 403 })
+      }
+
+      // Fetch the target user with tenant isolation
+      const user = await (prisma.userProfile.findFirst as any)({
+        where: { 
+          id: userId,
+          tenantId,
+          teamId: adminProfile.teamId // Ensure user is in same team
+        }
+      })
+
+      if (!user) {
+        return NextResponse.json({ error: 'User not found in your organization' }, { status: 404 })
+      }
+
+      return NextResponse.json({ 
+        success: true,
+        user: {
+          id: user.id,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email,
+          username: user.username,
+          role: user.role,
+          teamId: user.teamId,
+          tenantId: user.tenantId,
+          createdAt: user.createdAt
+        }
+      })
+    } catch (error) {
+      console.error('Error fetching user for role edit:', error)
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    }
+  })
 }
 
 // PUT: Update user role
@@ -76,37 +90,47 @@ export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ userId: string }> }
 ) {
-  try {
-    const session = await getServerSession(authOptions)
-    const { userId } = await params
-    const { role } = await req.json()
-    
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+  return withTenantContext(req, async (enhancedReq) => {
+    try {
+      const session = await getServerSession(authOptions)
+      const { userId } = await params
+      const { role } = await enhancedReq.json()
+      const tenantId = getTenantId(enhancedReq)
+      
+      if (!session?.user?.id) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      }
 
-    // Validate role
-    if (!Object.values(ROLES).includes(role)) {
-      return NextResponse.json({ error: 'Invalid role specified' }, { status: 400 })
-    }
+      if (!tenantId) {
+        return NextResponse.json({ error: 'Tenant context required' }, { status: 400 })
+      }
 
-    // Get admin user profile
-    const adminProfile = await prisma.userProfile.findUnique({
-      where: { id: session.user.id },
-      select: { role: true, teamId: true }
-    })
+      // Validate role
+      if (!Object.values(ROLES).includes(role)) {
+        return NextResponse.json({ error: 'Invalid role specified' }, { status: 400 })
+      }
 
-    if (!adminProfile) {
-      return NextResponse.json({ error: 'Admin profile not found' }, { status: 404 })
-    }
+      // Get admin user profile with tenant isolation
+      const adminProfile = await (prisma.userProfile.findFirst as any)({
+        where: { 
+          id: session.user.id,
+          tenantId
+        },
+        select: { role: true, teamId: true }
+      })
 
-    // Check if user has permission to manage team
-    const canManageTeam = await hasPermission(
-      session.user.id, 
-      adminProfile.teamId!, 
-      MODULES.TEAM_MANAGEMENT, 
-      ACTIONS.MANAGE
-    )
+      if (!adminProfile) {
+        return NextResponse.json({ error: 'Admin profile not found' }, { status: 404 })
+      }
+
+      // Check if user has permission to manage team
+      const canManageTeam = await hasPermission(
+        session.user.id, 
+        tenantId,
+        adminProfile.teamId!, 
+        MODULES.TEAM_MANAGEMENT, 
+        ACTIONS.MANAGE
+      )
 
     if (!canManageTeam) {
       return NextResponse.json({ error: 'Forbidden: Insufficient permissions to manage users' }, { status: 403 })
@@ -198,4 +222,5 @@ export async function PUT(
     console.error('Error updating user role:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
+  })
 }

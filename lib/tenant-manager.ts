@@ -11,6 +11,8 @@ export interface CreateTenantData {
   maxUsers?: number
   maxStorage?: bigint
   maxApiCalls?: number
+  primaryColor?: string
+  secondaryColor?: string
   adminEmail: string
   adminFirstName: string
   adminLastName: string
@@ -105,7 +107,7 @@ export class TenantManager {
           action: 'tenant_created',
           entityType: 'tenant',
           entityId: tenant.id,
-          newValues: { tenantData: tenant }
+          newValues: { tenantData: JSON.parse(JSON.stringify(tenant)) }
         }
       })
       
@@ -176,8 +178,8 @@ export class TenantManager {
           action: 'tenant_settings_updated',
           entityType: 'tenant',
           entityId: tenantId,
-          oldValues: { settings: currentTenant },
-          newValues: { settings: updatedTenant }
+          oldValues: { settings: JSON.parse(JSON.stringify(currentTenant)) },
+          newValues: { settings: JSON.parse(JSON.stringify(updatedTenant)) }
         }
       })
     }
@@ -232,7 +234,7 @@ export class TenantManager {
           action: 'tenant_deleted',
           entityType: 'tenant',
           entityId: tenantId,
-          oldValues: { tenant }
+          oldValues: { tenant: JSON.parse(JSON.stringify(tenant)) }
         }
       })
     }

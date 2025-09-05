@@ -76,6 +76,7 @@ export function getRoleDescription(role: string): string {
  */
 export async function hasPermission(
   userId: string,
+  tenantId: string,
   teamId: string,
   module: ModuleType,
   action: ActionType
@@ -104,13 +105,12 @@ export async function hasPermission(
     if (!permission) return false;
 
     // Check for explicit user permission override
-    const userPermission = await prisma.userPermission.findUnique({
+    const userPermission = await (prisma.userPermission.findFirst as any)({
       where: {
-        userId_permissionId_teamId: {
-          userId,
-          permissionId: permission.id,
-          teamId
-        }
+        userId,
+        permissionId: permission.id,
+        tenantId,
+        teamId
       }
     });
 
@@ -121,13 +121,12 @@ export async function hasPermission(
     if (userPermission && userPermission.granted) return true;
 
     // Check role-based permission
-    const rolePermission = await prisma.rolePermission.findUnique({
+    const rolePermission = await (prisma.rolePermission.findFirst as any)({
       where: {
-        role_permissionId_teamId: {
-          role: userProfile.role,
-          permissionId: permission.id,
-          teamId
-        }
+        role: userProfile.role,
+        permissionId: permission.id,
+        tenantId: tenantId,
+        teamId
       }
     });
 
@@ -205,6 +204,7 @@ export async function getUserPermissions(userId: string, teamId: string) {
  */
 export async function grantPermission(
   userId: string,
+  tenantId: string,
   teamId: string,
   module: ModuleType,
   action: ActionType
@@ -221,24 +221,32 @@ export async function grantPermission(
 
     if (!permission) return false;
 
-    await prisma.userPermission.upsert({
+    // Check if permission already exists, then update or create
+    const existingPermission = await (prisma.userPermission.findFirst as any)({
       where: {
-        userId_permissionId_teamId: {
-          userId,
-          permissionId: permission.id,
-          teamId
-        }
-      },
-      update: {
-        granted: true
-      },
-      create: {
         userId,
         permissionId: permission.id,
-        teamId,
-        granted: true
+        tenantId,
+        teamId
       }
     });
+
+    if (existingPermission) {
+      await (prisma.userPermission.update as any)({
+        where: { id: existingPermission.id },
+        data: { granted: true }
+      });
+    } else {
+      await (prisma.userPermission.create as any)({
+        data: {
+          userId,
+          permissionId: permission.id,
+          tenantId,
+          teamId,
+          granted: true
+        }
+      });
+    }
 
     return true;
   } catch (error) {
@@ -252,6 +260,7 @@ export async function grantPermission(
  */
 export async function revokePermission(
   userId: string,
+  tenantId: string,
   teamId: string,
   module: ModuleType,
   action: ActionType
@@ -268,24 +277,32 @@ export async function revokePermission(
 
     if (!permission) return false;
 
-    await prisma.userPermission.upsert({
+    // Check if permission already exists, then update or create
+    const existingPermission = await (prisma.userPermission.findFirst as any)({
       where: {
-        userId_permissionId_teamId: {
-          userId,
-          permissionId: permission.id,
-          teamId
-        }
-      },
-      update: {
-        granted: false
-      },
-      create: {
         userId,
         permissionId: permission.id,
-        teamId,
-        granted: false
+        tenantId,
+        teamId
       }
     });
+
+    if (existingPermission) {
+      await (prisma.userPermission.update as any)({
+        where: { id: existingPermission.id },
+        data: { granted: false }
+      });
+    } else {
+      await (prisma.userPermission.create as any)({
+        data: {
+          userId,
+          permissionId: permission.id,
+          tenantId,
+          teamId,
+          granted: false
+        }
+      });
+    }
 
     return true;
   } catch (error) {
@@ -368,12 +385,14 @@ export async function getRolePermissions(role: UserRole, teamId: string) {
 export async function canImpersonate(
   impersonatorId: string,
   targetUserId: string,
+  tenantId: string,
   teamId: string
 ): Promise<boolean> {
   try {
     // Check if impersonator has impersonation permission
     const hasImpersonationPermission = await hasPermission(
       impersonatorId,
+      tenantId,
       teamId,
       MODULES.TEAM_MANAGEMENT,
       ACTIONS.IMPERSONATE

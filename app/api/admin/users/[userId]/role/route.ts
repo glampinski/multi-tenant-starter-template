@@ -4,43 +4,54 @@ import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 import { hasPermission } from '@/lib/permissions'
 import { MODULES, ACTIONS, ROLES } from '@/types/permissions'
+import { withTenantContext, getTenantId } from '@/lib/tenant-context'
 
 // PUT: Update user role
 export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ userId: string }> }
 ) {
-  try {
-    const session = await getServerSession(authOptions)
-    const { userId } = await params
-    const { role } = await req.json()
-    
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+  return withTenantContext(req, async (enhancedReq) => {
+    try {
+      const session = await getServerSession(authOptions)
+      const { userId } = await params
+      const { role } = await enhancedReq.json()
+      const tenantId = getTenantId(enhancedReq)
+      
+      if (!session?.user?.id) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      }
 
-    // Validate role
-    if (!Object.values(ROLES).includes(role)) {
-      return NextResponse.json({ error: 'Invalid role specified' }, { status: 400 })
-    }
+      if (!tenantId) {
+        return NextResponse.json({ error: 'Tenant context required' }, { status: 400 })
+      }
 
-    // Get admin user profile
-    const adminProfile = await prisma.userProfile.findUnique({
-      where: { id: session.user.id },
-      select: { role: true, teamId: true }
-    })
+      // Validate role
+      if (!Object.values(ROLES).includes(role)) {
+        return NextResponse.json({ error: 'Invalid role specified' }, { status: 400 })
+      }
 
-    if (!adminProfile) {
-      return NextResponse.json({ error: 'Admin profile not found' }, { status: 404 })
-    }
+      // Get admin user profile with tenant isolation
+      const adminProfile = await (prisma.userProfile.findFirst as any)({
+        where: { 
+          id: session.user.id,
+          tenantId
+        },
+        select: { role: true, teamId: true }
+      })
 
-    // Check if user has permission to manage team
-    const canManageTeam = await hasPermission(
-      session.user.id, 
-      adminProfile.teamId!, 
-      MODULES.TEAM_MANAGEMENT, 
-      ACTIONS.MANAGE
-    )
+      if (!adminProfile) {
+        return NextResponse.json({ error: 'Admin profile not found' }, { status: 404 })
+      }
+
+      // Check if user has permission to manage team
+      const canManageTeam = await hasPermission(
+        session.user.id, 
+        tenantId,
+        adminProfile.teamId!, 
+        MODULES.TEAM_MANAGEMENT, 
+        ACTIONS.MANAGE
+      )
 
     if (!canManageTeam) {
       return NextResponse.json({ error: 'Forbidden: Insufficient permissions to manage users' }, { status: 403 })
@@ -54,9 +65,10 @@ export async function PUT(
     }
 
     // Fetch the target user to ensure they exist and are in the same team
-    const targetUser = await prisma.userProfile.findFirst({
+    const targetUser = await (prisma.userProfile.findFirst as any)({
       where: { 
         id: userId,
+        tenantId,
         teamId: adminProfile.teamId
       }
     })
@@ -74,9 +86,10 @@ export async function PUT(
 
     // Prevent demotion of the last super admin
     if (targetUser.role === ROLES.SUPER_ADMIN && role !== ROLES.SUPER_ADMIN) {
-      const superAdminCount = await prisma.userProfile.count({
+      const superAdminCount = await (prisma.userProfile.count as any)({
         where: { 
           role: ROLES.SUPER_ADMIN,
+          tenantId,
           teamId: adminProfile.teamId
         }
       })
@@ -103,9 +116,10 @@ export async function PUT(
     })
 
     // Create audit log entry
-    await prisma.securityAuditLog.create({
+    await (prisma.securityAuditLog.create as any)({
       data: {
         userId: session.user.id,
+        tenantId,
         action: 'ROLE_CHANGE',
         resource: `user:${userId}`,
         details: {
@@ -115,10 +129,10 @@ export async function PUT(
           adminId: session.user.id,
           timestamp: new Date().toISOString()
         },
-        ipAddress: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown',
-        userAgent: req.headers.get('user-agent') || 'unknown'
+        ipAddress: enhancedReq.headers.get('x-forwarded-for') || enhancedReq.headers.get('x-real-ip') || 'unknown',
+        userAgent: enhancedReq.headers.get('user-agent') || 'unknown'
       }
-    }).catch(error => {
+    }).catch((error: any) => {
       // Log audit creation error but don't fail the request
       console.error('Failed to create audit log:', error)
     })
@@ -132,4 +146,5 @@ export async function PUT(
     console.error('Error updating user role:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
+  })
 }
