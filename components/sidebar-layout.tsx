@@ -8,6 +8,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { Button } from "./ui/button";
+import { TenantSwitcher } from "./ui/tenant-switcher";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -83,6 +84,12 @@ function SidebarContent(props: {
       <div className="h-14 flex items-center px-2 shrink-0 mr-10 md:mr-0 border-b">
         {props.sidebarTop}
       </div>
+      
+      {/* Tenant Switcher */}
+      <div className="px-2 py-3 border-b">
+        <TenantSwitcher className="w-full" />
+      </div>
+      
       <div className="flex flex-grow flex-col gap-2 pt-4 overflow-y-auto">
         {props.items.map((item, index) => {
           if (item.type === "separator") {

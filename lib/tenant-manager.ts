@@ -180,7 +180,7 @@ export class TenantManager {
       await prisma.tenantAuditLog.create({
         data: {
           tenantId,
-          userId: currentTenant.createdById || currentTenant.id,
+          userId: updatedBy,
           action: 'tenant_updated',
           entityType: 'tenant',
           entityId: tenantId,
