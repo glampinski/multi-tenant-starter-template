@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { withTeamContext, TeamContextRequest, getTeamContext } from '@/lib/teamContext'
-import { hasPermission } from '@/lib/permissions'
-import { MODULES, ACTIONS } from '@/types/permissions'
 
 async function getSalesAnalyticsHandler(
   req: TeamContextRequest,
@@ -11,19 +9,6 @@ async function getSalesAnalyticsHandler(
   try {
     const { teamId, userProfile } = getTeamContext(req)
     const { userId } = await params
-
-    // Check permission to view sales analytics
-    const canViewSales = await hasPermission(
-      userProfile.id, 
-      teamId, 
-      MODULES.SALES, 
-      ACTIONS.VIEW
-    )
-
-    if (!canViewSales) {
-      return NextResponse.json({ error: 'Forbidden: Insufficient permissions to view sales analytics' }, { status: 403 })
-    }
-
     const { searchParams } = new URL(req.url)
     const timeframe = searchParams.get('timeframe') || '30d'
 

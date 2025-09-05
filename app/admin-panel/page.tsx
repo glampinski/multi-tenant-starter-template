@@ -583,6 +583,119 @@ export default function SuperAdminPanel() {
             </SimpleGrid>
           </Stack>
         );
+      case 'users':
+        return (
+          <Stack gap="md">
+            <Group justify="space-between">
+              <Title order={2}>User Management</Title>
+              <Text size="sm" c="dimmed">
+                Manage user roles and permissions across the platform
+              </Text>
+            </Group>
+            
+            <Card shadow="sm" padding="lg" radius="md" withBorder>
+              <Title order={3} mb="md">Platform Users</Title>
+              <ScrollArea>
+                <Table striped highlightOnHover>
+                  <Table.Thead>
+                    <Table.Tr>
+                      <Table.Th>User</Table.Th>
+                      <Table.Th>Email</Table.Th>
+                      <Table.Th>Current Role</Table.Th>
+                      <Table.Th>Team</Table.Th>
+                      <Table.Th>Status</Table.Th>
+                      <Table.Th>Actions</Table.Th>
+                    </Table.Tr>
+                  </Table.Thead>
+                  <Table.Tbody>
+                    {users.map((user) => (
+                      <Table.Tr key={user.id}>
+                        <Table.Td>
+                          <Group gap="sm">
+                            <Avatar src={user.image} size="sm" radius="xl">
+                              {user.firstName?.[0]}{user.lastName?.[0]}
+                            </Avatar>
+                            <div>
+                              <Text size="sm" fw={500}>
+                                {user.firstName} {user.lastName}
+                              </Text>
+                              <Text size="xs" c="dimmed">
+                                ID: {user.id.slice(0, 8)}...
+                              </Text>
+                            </div>
+                          </Group>
+                        </Table.Td>
+                        <Table.Td>
+                          <Text size="sm">{user.email}</Text>
+                        </Table.Td>
+                        <Table.Td>
+                          <Badge
+                            color={
+                              user.role === 'SUPER_ADMIN' ? 'red' :
+                              user.role === 'ADMIN' ? 'orange' :
+                              user.role === 'MANAGER' ? 'blue' :
+                              user.role === 'SALES_REP' ? 'green' : 'gray'
+                            }
+                            variant="light"
+                          >
+                            {user.role.replace('_', ' ')}
+                          </Badge>
+                        </Table.Td>
+                        <Table.Td>
+                          <Text size="sm">
+                            {user.team?.name || 'No Team'}
+                          </Text>
+                        </Table.Td>
+                        <Table.Td>
+                          <Badge
+                            color={user.status === 'ACTIVE' ? 'green' : 'gray'}
+                            variant="light"
+                          >
+                            {user.status}
+                          </Badge>
+                        </Table.Td>
+                        <Table.Td>
+                          <Group gap="xs">
+                            <ActionIcon
+                              variant="light"
+                              color="blue"
+                              size="sm"
+                              onClick={() => window.open(`/admin-panel/users/${user.id}/edit-role`, '_blank')}
+                              title="Edit User Role"
+                            >
+                              <IconEdit size={14} />
+                            </ActionIcon>
+                            <ActionIcon
+                              variant="light"
+                              color="green"
+                              size="sm"
+                              onClick={() => window.open(`/dashboard?impersonate=${user.id}`, '_blank')}
+                              title="Impersonate User"
+                            >
+                              <IconEye size={14} />
+                            </ActionIcon>
+                          </Group>
+                        </Table.Td>
+                      </Table.Tr>
+                    ))}
+                  </Table.Tbody>
+                </Table>
+              </ScrollArea>
+              
+              {users.length === 0 && (
+                <Center py="xl">
+                  <Stack align="center">
+                    <IconUsers size={48} color="gray" />
+                    <Text c="dimmed">No users found</Text>
+                    <Text size="xs" c="dimmed">
+                      Users will appear here once they register or are invited
+                    </Text>
+                  </Stack>
+                </Center>
+              )}
+            </Card>
+          </Stack>
+        );
       default:
         return (
           <Card shadow="sm" padding="lg" radius="md" withBorder>

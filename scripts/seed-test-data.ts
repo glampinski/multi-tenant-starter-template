@@ -11,7 +11,7 @@ async function seedTestData() {
   // Create test users with different roles
   const testUsers = [
     {
-      stackUserId: 'user_super_admin_1',
+      id: 'user_super_admin_1',
       username: 'superadmin',
       role: UserRole.SUPER_ADMIN,
       firstName: 'Super',
@@ -20,7 +20,7 @@ async function seedTestData() {
       teamId: testTeamId
     },
     {
-      stackUserId: 'user_admin_1',
+      id: 'user_admin_1',
       username: 'admin1',
       role: UserRole.ADMIN,
       firstName: 'Alice',
@@ -29,7 +29,7 @@ async function seedTestData() {
       teamId: testTeamId
     },
     {
-      stackUserId: 'user_employee_1',
+      id: 'user_employee_1',
       username: 'employee1',
       role: UserRole.EMPLOYEE,
       firstName: 'Bob',
@@ -38,7 +38,7 @@ async function seedTestData() {
       teamId: testTeamId
     },
     {
-      stackUserId: 'user_sales_1',
+      id: 'user_sales_1',
       username: 'sales1',
       role: UserRole.SALES_PERSON,
       firstName: 'Carol',
@@ -47,7 +47,7 @@ async function seedTestData() {
       teamId: testTeamId
     },
     {
-      stackUserId: 'user_sales_2',
+      id: 'user_sales_2',
       username: 'sales2',
       role: UserRole.SALES_PERSON,
       firstName: 'David',
@@ -56,7 +56,7 @@ async function seedTestData() {
       teamId: testTeamId
     },
     {
-      stackUserId: 'user_customer_1',
+      id: 'user_customer_1',
       username: 'customer1',
       role: UserRole.CUSTOMER,
       firstName: 'Eve',
@@ -65,7 +65,7 @@ async function seedTestData() {
       teamId: testTeamId
     },
     {
-      stackUserId: 'user_customer_2',
+      id: 'user_customer_2',
       username: 'customer2',
       role: UserRole.CUSTOMER,
       firstName: 'Frank',
@@ -79,7 +79,7 @@ async function seedTestData() {
 
   for (const userData of testUsers) {
     await prisma.userProfile.upsert({
-      where: { stackUserId: userData.stackUserId },
+      where: { id: userData.id },
       update: userData,
       create: userData
     });

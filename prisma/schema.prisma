@@ -20,6 +20,24 @@ enum UserRole {
   CUSTOMER
 }
 
+// Enum for tenant statuses
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+  TRIAL
+  EXPIRED
+  PENDING_SETUP
+}
+
+// Enum for tenant subscription plans
+enum TenantPlan {
+  FREE
+  BASIC
+  PROFESSIONAL
+  ENTERPRISE
+  CUSTOM
+}
+
 // Enum for referral statuses
 enum ReferralStatus {
   PENDING
@@ -37,7 +55,81 @@ enum CustomerStatus {
   CHURNED
 }
 
-// Extended user profile (updated for NextAuth)
+// Core Tenant/Organization Model
+model Tenant {
+  id              String      @id @default(cuid())
+  name            String
+  slug            String      @unique // For subdomain: slug.yourapp.com
+  domain          String?     @unique // Custom domain: tenant.com
+  description     String?
+  
+  // Tenant configuration
+  status          TenantStatus @default(TRIAL)
+  plan            TenantPlan   @default(FREE)
+  settings        Json?       // Flexible tenant-specific settings
+  
+  // Branding & Customization
+  logoUrl         String?
+  primaryColor    String?     @default("#3B82F6") // Default blue
+  secondaryColor  String?     @default("#10B981") // Default green
+  customCss       String?     // Custom CSS overrides
+  
+  // Billing & Limits
+  maxUsers        Int         @default(5)
+  maxStorage      BigInt      @default(1073741824) // 1GB in bytes
+  maxApiCalls     Int         @default(10000) // Per month
+  
+  // Subscription details
+  stripeCustomerId     String?
+  stripeSubscriptionId String?
+  billingEmail         String?
+  subscriptionStartsAt DateTime?
+  subscriptionEndsAt   DateTime?
+  
+  // Timestamps
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  
+  // Relations
+  users           UserProfile[]
+  teams           TeamSettings[]
+  customers       Customer[]
+  referralRelationships ReferralRelationship[]
+  referralRewards ReferralReward[]
+  salesActivities SalesActivity[]
+  auditLogs       TenantAuditLog[]
+  
+  @@map("tenants")
+  @@index([slug])
+  @@index([domain])
+  @@index([status])
+}
+
+// Tenant-specific audit logging
+model TenantAuditLog {
+  id          String   @id @default(cuid())
+  tenantId    String
+  userId      String?  // May be null for system actions
+  action      String   // 'user_created', 'settings_updated', etc.
+  entityType  String   // 'user', 'tenant', 'customer', etc.
+  entityId    String?  // ID of the affected entity
+  oldValues   Json?    // Previous state
+  newValues   Json?    // New state
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+  
+  // Relations
+  tenant      Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  
+  @@map("tenant_audit_logs")
+  @@index([tenantId, createdAt])
+  @@index([tenantId, action])
+  @@index([tenantId, entityType, entityId])
+}
+
+// Enhanced user profile with tenant association
+// Enhanced user profile with tenant association
 model UserProfile {
   id            String    @id @default(cuid())
   email         String    @unique
@@ -48,7 +140,10 @@ model UserProfile {
   phone         String?
   avatar        String?
   companyName   String?
-  teamId        String?   @default("main_team") // Single team approach
+  
+  // Multi-tenant associations
+  tenantId      String    // Required - every user belongs to a tenant
+  teamId        String?   @default("main_team") // Team within the tenant
   
   // NextAuth invitation system
   inviteVerified Boolean   @default(false)
@@ -64,6 +159,7 @@ model UserProfile {
   lastLoginAt   DateTime?
   
   // Relations
+  tenant             Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   referrer           UserProfile?           @relation("UserReferrals", fields: [referrerId], references: [id])
   referrals          UserProfile[]          @relation("UserReferrals")
   sentSecureInvites  InviteToken[]          @relation("SecureUserInvites")
@@ -79,6 +175,9 @@ model UserProfile {
   salesActivities    SalesActivity[]
   
   @@map("user_profiles")
+  @@index([tenantId])
+  @@index([tenantId, role])
+  @@index([tenantId, teamId])
 }
 
 // Secure Magic Link Token System
@@ -283,6 +382,7 @@ model ReferralRelationship {
   id            String         @id @default(cuid())
   referrerId    String         // Who made the referral
   referredId    String         // Who was referred
+  tenantId      String         // Tenant association
   level         Int            @default(1) // 1-5 levels deep
   status        ReferralStatus @default(PENDING)
   
@@ -298,12 +398,15 @@ model ReferralRelationship {
   rewardedAt    DateTime?      // When rewards were distributed
   
   // Relations
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   referrer      UserProfile    @relation("Referrer", fields: [referrerId], references: [id])
   referred      UserProfile    @relation("Referred", fields: [referredId], references: [id])
   rewards       ReferralReward[]
   
   @@unique([referrerId, referredId])
   @@map("referral_relationships")
+  @@index([tenantId])
+  @@index([tenantId, status])
 }
 
 // Referral rewards and commissions
@@ -311,6 +414,7 @@ model ReferralReward {
   id                 String               @id @default(cuid())
   relationshipId     String               // Link to referral relationship
   userId             String               // Who receives the reward
+  tenantId           String               // Tenant association
   level              Int                  // Reward level (1-5)
   rewardType         String               // "commission", "bonus", "points"
   amount             Decimal              @db.Decimal(10,2)
@@ -328,10 +432,13 @@ model ReferralReward {
   paidAt             DateTime?
   
   // Relations
+  tenant             Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   relationship       ReferralRelationship @relation(fields: [relationshipId], references: [id])
   user              UserProfile          @relation(fields: [userId], references: [id])
   
   @@map("referral_rewards")
+  @@index([tenantId])
+  @@index([tenantId, userId])
 }
 
 // Customer management
@@ -341,7 +448,7 @@ model Customer {
   // Basic info
   firstName       String
   lastName        String
-  email           String         @unique
+  email           String
   phone           String?
   company         String?
   position        String?
@@ -357,7 +464,8 @@ model Customer {
   
   // Assignment
   salesPersonId   String?        // Assigned sales person
-  teamId          String?        @default("main_team") // Single team approach
+  tenantId        String         // Tenant association
+  teamId          String?        @default("main_team") // Team within tenant
   
   // Metadata
   notes           String?
@@ -369,10 +477,15 @@ model Customer {
   lastContactAt   DateTime?
   
   // Relations
+  tenant          Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   salesPerson     UserProfile?   @relation("SalesPersonCustomers", fields: [salesPersonId], references: [id])
   activities      SalesActivity[]
   
   @@map("customers")
+  @@unique([email, tenantId]) // Email unique within tenant
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, salesPersonId])
 }
 
 // Sales activity tracking
@@ -388,7 +501,8 @@ model SalesActivity {
   // Relations
   customerId    String
   salesPersonId String
-  teamId        String?     @default("main_team") // Single team approach
+  tenantId      String      // Tenant association
+  teamId        String?     @default("main_team") // Team within tenant
   
   // Scheduling
   scheduledAt   DateTime?
@@ -399,38 +513,41 @@ model SalesActivity {
   updatedAt     DateTime    @updatedAt
   
   // Relations
+  tenant        Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   customer      Customer    @relation(fields: [customerId], references: [id])
   salesPerson   UserProfile @relation(fields: [salesPersonId], references: [id])
   
   @@map("sales_activities")
+  @@index([tenantId])
+  @@index([tenantId, salesPersonId])
+  @@index([tenantId, customerId])
 }
 
-// Team/workspace settings (single team approach)
+// Team settings (enhanced for multi-tenancy)
 model TeamSettings {
-  id                    String   @id @default(cuid())
-  teamId                String   @unique @default("main_team") // Single team approach
+  id                    String  @id @default(cuid())
+  name                  String
+  description           String?
+  tenantId              String  // Tenant association
   
-  // Referral settings
-  referralEnabled       Boolean  @default(true)
-  maxReferralLevels     Int      @default(5)
-  referralRewardEnabled Boolean  @default(true)
+  // Team configuration
+  commissionRate        Decimal @default(10.0) @db.Decimal(5,2)
+  referralBonusRate     Decimal @default(5.0)  @db.Decimal(5,2)
+  maxReferralLevels     Int     @default(5)
   
-  // Commission structure (per level)
-  level1Commission      Decimal  @default(10.00) @db.Decimal(5,2)
-  level2Commission      Decimal  @default(5.00)  @db.Decimal(5,2)
-  level3Commission      Decimal  @default(3.00)  @db.Decimal(5,2)
-  level4Commission      Decimal  @default(2.00)  @db.Decimal(5,2)
-  level5Commission      Decimal  @default(1.00)  @db.Decimal(5,2)
-  
-  // Business settings
-  currency              String   @default("USD")
-  timezone              String   @default("UTC")
+  // Team limits
+  maxMembers            Int?    @default(50)
   
   // Timestamps
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
   
+  // Relations
+  tenant                Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  
   @@map("team_settings")
+  @@unique([name, tenantId]) // Team name unique within tenant
+  @@index([tenantId])
 }
 
 // Permission system for granular access control
@@ -458,7 +575,8 @@ model RolePermission {
   id           String   @id @default(cuid())
   role         UserRole
   permissionId String
-  teamId       String   @default("main_team") // Single team approach
+  tenantId     String?  // Null for global permissions, set for tenant-specific overrides
+  teamId       String   @default("main_team") // Team within tenant
   
   // Relations
   permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
@@ -467,8 +585,9 @@ model RolePermission {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  @@unique([role, permissionId, teamId])
+  @@unique([role, permissionId, tenantId, teamId])
   @@map("role_permissions")
+  @@index([tenantId]) // For tenant-specific queries
 }
 
 // User-specific permission overrides
@@ -476,7 +595,8 @@ model UserPermission {
   id           String      @id @default(cuid())
   userId       String      // UserProfile ID
   permissionId String
-  teamId       String      @default("main_team") // Single team approach
+  tenantId     String      // Tenant association
+  teamId       String      @default("main_team") // Team within tenant
   granted      Boolean     @default(true) // false = explicitly denied (override role permission)
   
   // Relations
@@ -487,6 +607,7 @@ model UserPermission {
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
 
-  @@unique([userId, permissionId, teamId])
+  @@unique([userId, permissionId, tenantId, teamId])
   @@map("user_permissions")
+  @@index([tenantId])
 }

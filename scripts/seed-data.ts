@@ -113,9 +113,8 @@ async function seedData() {
           referrerId: 'user_1_test',
           referredId: 'user_2_test',
           level: 1,
-          teamId: 'team_1',
-          status: 'ACTIVE',
-          joinedAt: new Date(),
+          status: 'CONFIRMED',
+          confirmedAt: new Date(),
         }
       }),
       prisma.referralRelationship.create({
@@ -123,9 +122,8 @@ async function seedData() {
           referrerId: 'user_2_test',
           referredId: 'user_3_test',
           level: 1,
-          teamId: 'team_1',
-          status: 'ACTIVE',
-          joinedAt: new Date(),
+          status: 'CONFIRMED',
+          confirmedAt: new Date(),
         }
       }),
     ]);
@@ -138,33 +136,33 @@ async function seedData() {
         data: {
           customerId: customers[0].id,
           salesPersonId: 'user_2_test',
-          teamId: 'team_1',
-          type: 'SALE',
-          amount: 2500,
-          description: 'Initial subscription sale',
-          date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // 1 week ago
+          type: 'call',
+          subject: 'Initial contact call',
+          description: 'First contact with the customer',
+          outcome: 'positive',
+          completedAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // 1 week ago
         }
       }),
       prisma.salesActivity.create({
         data: {
           customerId: customers[0].id,
           salesPersonId: 'user_2_test',
-          teamId: 'team_1',
-          type: 'UPSELL',
-          amount: 2500,
-          description: 'Premium feature upgrade',
-          date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 days ago
+          type: 'meeting',
+          subject: 'Product demo meeting',
+          description: 'Premium feature demonstration',
+          outcome: 'positive',
+          completedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 days ago
         }
       }),
       prisma.salesActivity.create({
         data: {
           customerId: customers[1].id,
           salesPersonId: 'user_2_test',
-          teamId: 'team_1',
-          type: 'SALE',
-          amount: 2500,
-          description: 'Startup package sale',
-          date: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), // 3 days ago
+          type: 'proposal',
+          subject: 'Startup package proposal',
+          description: 'Sent startup package proposal',
+          outcome: 'positive',
+          completedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), // 3 days ago
         }
       }),
     ]);
@@ -176,24 +174,24 @@ async function seedData() {
       prisma.referralReward.create({
         data: {
           userId: 'user_1_test',
-          referralId: referrals[0].id,
+          relationshipId: referrals[0].id,
           amount: 250,
-          type: 'COMMISSION',
-          status: 'PAID',
-          teamId: 'team_1',
-          description: 'Level 1 referral commission',
+          rewardType: 'COMMISSION',
+          isPaid: true,
+          level: 1,
+          currency: 'USD',
           paidAt: new Date(),
         }
       }),
       prisma.referralReward.create({
         data: {
           userId: 'user_2_test',
-          referralId: referrals[1].id,
+          relationshipId: referrals[1].id,
           amount: 125,
-          type: 'COMMISSION',
-          status: 'PENDING',
-          teamId: 'team_1',
-          description: 'Level 1 referral commission',
+          rewardType: 'COMMISSION',
+          isPaid: false,
+          level: 1,
+          currency: 'USD',
         }
       }),
     ]);
@@ -206,11 +204,9 @@ async function seedData() {
       update: {},
       create: {
         teamId: 'team_1',
-        referralCommissionRate: 0.10, // 10%
+        referralEnabled: true,
         maxReferralLevels: 5,
-        autoApproveReferrals: true,
-        customFields: ['industry', 'company_size'],
-        integrations: ['stripe', 'mailchimp'],
+        referralRewardEnabled: true,
       }
     });
 

@@ -116,7 +116,12 @@ const allFeatures: FeatureItem[] = [
 // Helper function to check if role has permission
 function hasRolePermission(userRole: string, permission: string): boolean {
   const rolePermissions = ROLE_PERMISSIONS[userRole as keyof typeof ROLE_PERMISSIONS];
-  return rolePermissions?.includes(permission as any) || false;
+  if (!rolePermissions) return false;
+  
+  // Handle wildcard permission for Super Admin (or any role with '*')
+  if (rolePermissions.includes('*' as any)) return true;
+  
+  return rolePermissions.includes(permission as any);
 }
 
 export default function RoleDemoPage() {

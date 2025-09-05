@@ -31,6 +31,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'NextAuth user not found' }, { status: 404 });
     }
     
+    // Create or get default system tenant for super admin
+    const systemTenant = await (prisma as any).tenant.upsert({
+      where: { slug: 'system' },
+      update: {},
+      create: {
+        name: 'System Administration',
+        slug: 'system',
+        domain: null,
+        description: 'System administration tenant for super admins',
+        status: 'ACTIVE',
+        plan: 'ENTERPRISE'
+      }
+    });
+    
     // Create user profile
     const userProfile = await prisma.userProfile.create({
       data: {
@@ -39,11 +53,12 @@ export async function POST(request: NextRequest) {
         firstName: 'Super',
         lastName: 'Admin',
         email: email,
+        tenantId: systemTenant.id,
         teamId: 'main_team',
         referralCode: `SUPER_${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
         inviteVerified: true,
         lineagePath: []
-      }
+      } as any
     });
     
     return NextResponse.json({ 

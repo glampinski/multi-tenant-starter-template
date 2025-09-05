@@ -1,20 +1,46 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getServerSession } from 'next-auth/next'
-import { authOptions } from '@/lib/auth'
+import { withTeamContext, TeamContextRequest } from '@/lib/teamContext'
 
-export async function GET(req: NextRequest, { params }: { params: Promise<{ userId: string }> }) {
+async function getReferralTreeHandler(
+  req: TeamContextRequest, 
+  { params }: { params: Promise<{ userId: string }> }
+) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const { userProfile, teamId } = req
+    const { userId } = await params
+    
+    if (!userProfile || !teamId) {
+      return NextResponse.json({ error: 'Team context required' }, { status: 400 })
     }
 
-    const { userId } = await params
+    // Validate that the target user is in the same team
+    const targetUser = await prisma.userProfile.findFirst({
+      where: {
+        id: userId,
+        teamId: teamId
+      }
+    })
 
-    // Get all referrals made by this user (their downline)
+    if (!targetUser) {
+      return NextResponse.json({ error: 'User not found in this team' }, { status: 404 })
+    }
+
+    // Permission check: users can only view their own tree unless they're admin/super-admin
+    if (userProfile.role === 'CUSTOMER' || userProfile.role === 'SALES_PERSON') {
+      if (userProfile.id !== userId) {
+        return NextResponse.json({ error: 'Forbidden - Can only view own referral tree' }, { status: 403 })
+      }
+    }
+
+    // Get all referrals made by this user (their downline) within the team
     const referralTree = await prisma.referralRelationship.findMany({
-      where: { referrerId: userId },
+      where: { 
+        referrerId: userId,
+        // Ensure both referrer and referred are in the same team
+        referrer: { teamId: teamId },
+        referred: { teamId: teamId }
+      },
       include: {
         referred: {
           select: {
@@ -24,7 +50,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ user
             lastName: true,
             email: true,
             role: true,
-            createdAt: true
+            createdAt: true,
+            teamId: true
           }
         },
         rewards: {
@@ -37,16 +64,17 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ user
       ]
     })
 
-    // Get referral statistics
-    const stats = await getReferralStats(userId)
+    // Get referral statistics within team
+    const stats = await getReferralStats(userId, teamId)
 
-    // Build hierarchical tree structure
-    const treeStructure = await buildReferralTree(userId)
+    // Build hierarchical tree structure within team
+    const treeStructure = await buildReferralTree(userId, teamId)
 
     return NextResponse.json({
       referrals: referralTree,
       stats,
-      tree: treeStructure
+      tree: treeStructure,
+      teamId
     })
   } catch (error) {
     console.error('Error fetching referral tree:', error)
@@ -54,7 +82,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ user
   }
 }
 
-async function getReferralStats(userId: string) {
+async function getReferralStats(userId: string, teamId: string) {
   const [
     totalReferrals,
     confirmedReferrals,
@@ -62,24 +90,32 @@ async function getReferralStats(userId: string) {
     totalEarnings,
     levelBreakdown
   ] = await Promise.all([
-    // Total referrals made
-    prisma.referralRelationship.count({
-      where: { referrerId: userId }
-    }),
-    
-    // Confirmed referrals
+    // Total referrals made within team
     prisma.referralRelationship.count({
       where: { 
         referrerId: userId,
-        status: 'CONFIRMED'
+        referrer: { teamId: teamId },
+        referred: { teamId: teamId }
       }
     }),
     
-    // Pending referrals
+    // Confirmed referrals within team
     prisma.referralRelationship.count({
       where: { 
         referrerId: userId,
-        status: 'PENDING'
+        status: 'CONFIRMED',
+        referrer: { teamId: teamId },
+        referred: { teamId: teamId }
+      }
+    }),
+    
+    // Pending referrals within team
+    prisma.referralRelationship.count({
+      where: { 
+        referrerId: userId,
+        status: 'PENDING',
+        referrer: { teamId: teamId },
+        referred: { teamId: teamId }
       }
     }),
     
@@ -89,10 +125,14 @@ async function getReferralStats(userId: string) {
       _sum: { amount: true }
     }),
     
-    // Breakdown by level
+    // Breakdown by level within team
     prisma.referralRelationship.groupBy({
       by: ['level'],
-      where: { referrerId: userId },
+      where: { 
+        referrerId: userId,
+        referrer: { teamId: teamId },
+        referred: { teamId: teamId }
+      },
       _count: { id: true }
     })
   ])
@@ -109,13 +149,16 @@ async function getReferralStats(userId: string) {
   }
 }
 
-async function buildReferralTree(userId: string, level: number = 1): Promise<any[]> {
+async function buildReferralTree(userId: string, teamId: string, level: number = 1): Promise<any[]> {
   if (level > 5) return [] // Max 5 levels
 
   const directReferrals = await prisma.referralRelationship.findMany({
     where: { 
       referrerId: userId,
-      level: 1 // Only direct referrals for tree building
+      level: 1, // Only direct referrals for tree building
+      // Ensure both users are in the same team
+      referrer: { teamId: teamId },
+      referred: { teamId: teamId }
     },
     include: {
       referred: {
@@ -126,7 +169,8 @@ async function buildReferralTree(userId: string, level: number = 1): Promise<any
           lastName: true,
           email: true,
           role: true,
-          createdAt: true
+          createdAt: true,
+          teamId: true
         }
       },
       rewards: {
@@ -140,9 +184,11 @@ async function buildReferralTree(userId: string, level: number = 1): Promise<any
   const tree = await Promise.all(
     directReferrals.map(async (referral: any) => ({
       ...referral,
-      children: await buildReferralTree(referral.referredId, level + 1)
+      children: await buildReferralTree(referral.referredId, teamId, level + 1)
     }))
   )
 
   return tree
 }
+
+export const GET = withTeamContext(getReferralTreeHandler)

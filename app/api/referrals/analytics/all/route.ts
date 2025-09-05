@@ -1,26 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getServerSession } from 'next-auth/next'
-import { authOptions } from '@/lib/auth'
+import { withTeamContext, TeamContextRequest } from '@/lib/teamContext'
 
-// GET: Fetch all referrals analytics (Super Admin only)
-export async function GET(req: NextRequest) {
+// GET: Fetch all referrals analytics with team isolation
+async function getAllReferralsAnalyticsHandler(req: TeamContextRequest) {
   try {
-    const session = await getServerSession(authOptions)
+    const { userProfile, teamId } = req
     
-    // Check if user is super admin
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Get user profile to check role
-    const userProfile = await prisma.userProfile.findUnique({
-      where: { id: session.user.id },
-      select: { role: true }
-    })
-
-    if (userProfile?.role !== 'SUPER_ADMIN') {
-      return NextResponse.json({ error: 'Forbidden - Super Admin access required' }, { status: 403 })
+    if (!userProfile || !teamId) {
+      return NextResponse.json({ error: 'Team context required' }, { status: 400 })
     }
 
     const { searchParams } = new URL(req.url)
@@ -30,11 +18,33 @@ export async function GET(req: NextRequest) {
 
     const skip = (page - 1) * limit
 
-    // Build where clause
-    const where: any = {}
+    // Build team-scoped where clause
+    const where: any = {
+      AND: [
+        // Ensure both referrer and referred are in the same team
+        {
+          referrer: { teamId: teamId },
+          referred: { teamId: teamId }
+        }
+      ]
+    }
     
     if (status) {
-      where.status = status
+      where.AND.push({ status: status })
+    }
+
+    // For non-super-admin roles, further restrict access
+    if (userProfile.role !== 'SUPER_ADMIN') {
+      // Team admins can see all team referrals
+      // Sales people can only see their own referrals
+      if (userProfile.role === 'SALES_PERSON') {
+        where.AND.push({
+          OR: [
+            { referrerId: userProfile.id },
+            { referredId: userProfile.id }
+          ]
+        })
+      }
     }
 
     // Fetch referral relationships with user details
@@ -51,7 +61,8 @@ export async function GET(req: NextRequest) {
               firstName: true,
               lastName: true,
               email: true,
-              username: true
+              username: true,
+              teamId: true
             }
           },
           referred: {
@@ -60,7 +71,8 @@ export async function GET(req: NextRequest) {
               firstName: true,
               lastName: true,
               email: true,
-              username: true
+              username: true,
+              teamId: true
             }
           },
           rewards: {
@@ -122,7 +134,8 @@ export async function GET(req: NextRequest) {
         paidCommissions,
         pendingCommissions,
         averageCommission: totalCount > 0 ? totalCommissions / totalCount : 0
-      }
+      },
+      teamId // Include team context for frontend
     })
 
   } catch (error) {
@@ -133,3 +146,5 @@ export async function GET(req: NextRequest) {
     )
   }
 }
+
+export const GET = withTeamContext(getAllReferralsAnalyticsHandler)

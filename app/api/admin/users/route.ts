@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
+import { hasPermission } from '@/lib/permissions'
+import { MODULES, ACTIONS } from '@/types/permissions'
 
 // GET: Fetch all users (Super Admin only)
 export async function GET(req: NextRequest) {
@@ -16,11 +18,27 @@ export async function GET(req: NextRequest) {
     // Get user profile to check role
     const userProfile = await prisma.userProfile.findUnique({
       where: { id: session.user.id },
-      select: { role: true }
+      select: { role: true, teamId: true }
     })
+
+    if (!userProfile) {
+      return NextResponse.json({ error: 'User profile not found' }, { status: 404 })
+    }
 
     if (userProfile?.role !== 'SUPER_ADMIN') {
       return NextResponse.json({ error: 'Forbidden - Super Admin access required' }, { status: 403 })
+    }
+
+    // Additional permission check for team management
+    const canManageTeam = await hasPermission(
+      session.user.id, 
+      userProfile.teamId!, 
+      MODULES.TEAM_MANAGEMENT, 
+      ACTIONS.MANAGE
+    )
+
+    if (!canManageTeam) {
+      return NextResponse.json({ error: 'Forbidden: Insufficient permissions to manage users' }, { status: 403 })
     }
 
     const { searchParams } = new URL(req.url)
